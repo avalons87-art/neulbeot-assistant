@@ -1,0 +1,28 @@
+# 의존성(설치본에 포함되지만 git으로는 관리 안 함)
+node_modules/
+
+# API 키·비밀 (절대 커밋 금지)
+my-keys.bat
+teacher-keys.bat
+keys.json
+
+# 사용자·설치별 설정 (git pull 시 보존)
+owner.txt
+work-dir.txt
+brand.txt
+schedule.json
+user-folders.json
+user-profiles.json
+folder-analysis.json
+
+# 산출물·임시
+outputs/
+Neulbeot-Teacher-Package/
+Neulbeot-Teacher-Package.zip
+*.log
+
+# OS/에디터
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,222 @@
+// 공용 AI 호출 모듈 — Claude(Anthropic) + Gemini(Google)
+// 키 우선순위: 개인 키(keys.json, 화면에서 입력) > 공유 키(env/my-keys.bat).
+// 개인 키를 넣으면 실행 중에도 바로 그 키로 바뀐다(재시작 불필요).
+
+const fs = require('fs');
+const path = require('path');
+
+const KEYS_FILE = path.join(__dirname, '..', 'keys.json');
+const CLAUDE_MODEL = process.env.MODEL || 'claude-opus-4-8';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+
+let Anthropic = null;
+try { Anthropic = require('@anthropic-ai/sdk'); }
+catch (e) { console.warn('[ai] @anthropic-ai/sdk 로드 실패:', e.message); }
+
+function loadPersonal() { try { return JSON.parse(fs.readFileSync(KEYS_FILE, 'utf8')); } catch { return {}; } }
+function savePersonal(o) { try { fs.writeFileSync(KEYS_FILE, JSON.stringify(o, null, 2), 'utf8'); } catch (e) { console.warn('[ai] keys.json 저장 실패:', e.message); } }
+let personal = loadPersonal();
+
+function anthropicKey() { return (personal.anthropic || process.env.ANTHROPIC_API_KEY || '').trim(); }
+function geminiKey() { return (personal.gemini || process.env.GEMINI_API_KEY || '').trim(); }
+function openrouterKey() { return (personal.openrouter || process.env.OPENROUTER_API_KEY || '').trim(); }
+function openrouterModel() { return (personal.openrouterModel || process.env.OPENROUTER_MODEL || '').trim(); }
+
+// 어느 제공자로 Claude 역할(팀장/에이전트/파싱)을 처리할지: OpenRouter 키가 있으면 그걸 우선.
+function provider() {
+  if (openrouterKey() && openrouterModel()) return 'openrouter';
+  if (anthropicKey() && Anthropic) return 'anthropic';
+  return 'none';
+}
+
+// OpenRouter(OpenAI 호환) 원본 호출. messages=OpenAI 형식. 반환: 응답 JSON.
+async function orChat(messages, opts = {}) {
+  const key = openrouterKey(); const model = opts.model || openrouterModel();
+  if (!key) throw new Error('OpenRouter 키 없음');
+  if (!model) throw new Error('OpenRouter 모델이 설정되지 않았어요(🔑에서 모델 입력).');
+  const body = { model, messages, max_tokens: opts.maxTokens || 1000 };
+  if (opts.tools) { body.tools = opts.tools; body.tool_choice = 'auto'; }
+  if (opts.jsonMode) body.response_format = { type: 'json_object' };
+  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json', 'X-Title': 'Neulbeot' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+// OpenRouter로 단순 텍스트 답변
+async function orText(system, user, opts = {}) {
+  const msgs = [{ role: 'system', content: system }, ...(opts.history || []), { role: 'user', content: user }];
+  const j = await orChat(msgs, { maxTokens: opts.maxTokens || 800, jsonMode: opts.jsonMode });
+  return (j.choices?.[0]?.message?.content || '').trim();
+}
+
+// Anthropic 클라이언트를 현재 키로 (키 바뀌면 재생성)
+let client = null, clientKey = null;
+function getClient() {
+  const k = anthropicKey();
+  if (!k || !Anthropic) return null;
+  if (client && clientKey === k) return client;
+  client = new Anthropic({ apiKey: k }); clientKey = k;
+  return client;
+}
+
+async function callClaude(system, user, opts = {}) {
+  if (provider() === 'openrouter') { try { return await orText(system, user, opts); } catch (e) { console.warn('[ai] OpenRouter 실패:', e.message); throw e; } }
+  const c = getClient(); if (!c) return null;
+  const history = Array.isArray(opts.history) ? opts.history : [];
+  const res = await c.messages.create({
+    model: CLAUDE_MODEL,
+    max_tokens: opts.maxTokens || 600,
+    output_config: { effort: opts.effort || 'medium' },
+    system,
+    messages: [...history, { role: 'user', content: user }],
+  });
+  return (res.content.find((b) => b.type === 'text')?.text || '').trim();
+}
+
+// 학사일정 텍스트 → 구조화된 일정 배열([{date,end?,title,tag}]). 구조화 출력으로 안정적 파싱.
+const SCHED_SCHEMA = {
+  type: 'object',
+  properties: {
+    events: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          date: { type: 'string', description: '시작일 YYYY-MM-DD' },
+          end: { type: 'string', description: '종료일 YYYY-MM-DD (기간일 때만)' },
+          title: { type: 'string' },
+          tag: { type: 'string', description: '행사/마감/휴업/상담/수업/연수/준비/자치/행정/일정 중 하나' },
+        },
+        required: ['date', 'title', 'tag'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['events'],
+  additionalProperties: false,
+};
+async function extractSchedule(text, opts = {}) {
+  const year = opts.year || '2026';
+  const sys = `너는 학사일정 파서다. 주어진 텍스트에서 학교 일정을 빠짐없이 뽑아 구조화한다.
+- 날짜는 반드시 YYYY-MM-DD. 연도가 없으면 ${year}(학년도 기준: 1~2월은 다음해)로 추정.
+- 여러 날 걸치는 일정은 end 로 종료일을 넣는다(하루면 생략).
+- tag 는 행사/마감/휴업/상담/수업/연수/준비/자치/행정/일정 중 가장 맞는 것.
+- 표·목록 형태여도 최대한 다 뽑되, 날짜가 불명확한 건 버린다.`;
+  const user = '학사일정 텍스트:\n' + String(text).slice(0, 14000);
+  // OpenRouter: JSON 모드로 파싱
+  if (provider() === 'openrouter') {
+    const t = await orText(sys + '\n반드시 {"events":[{"date","end","title","tag"}, ...]} JSON만 출력.', user, { maxTokens: 8000, jsonMode: true });
+    const m = t.match(/\{[\s\S]*\}/); if (!m) return [];
+    try { return (JSON.parse(m[0]).events) || []; } catch { return []; }
+  }
+  const c = getClient(); if (!c) return null;
+  // 1) 구조화 출력(권장)
+  try {
+    const res = await c.messages.create({
+      model: CLAUDE_MODEL, max_tokens: 8000,
+      output_config: { format: { type: 'json_schema', schema: SCHED_SCHEMA } },
+      system: sys, messages: [{ role: 'user', content: user }],
+    });
+    const t = res.content.find((b) => b.type === 'text')?.text || '{}';
+    const ev = (JSON.parse(t).events) || [];
+    if (ev.length) return ev;
+  } catch (e) { console.warn('[ai] 구조화 일정파싱 실패, 폴백:', e.message); }
+  // 2) 폴백: 일반 호출 + JSON 추출
+  const res2 = await c.messages.create({
+    model: CLAUDE_MODEL, max_tokens: 8000,
+    system: sys + '\n반드시 {"events":[{"date","end","title","tag"}, ...]} 형태의 JSON만 출력하라. 다른 말 금지.',
+    messages: [{ role: 'user', content: user }],
+  });
+  const t2 = res2.content.find((b) => b.type === 'text')?.text || '';
+  const m = t2.match(/\{[\s\S]*\}/);
+  if (!m) return [];
+  try { return (JSON.parse(m[0]).events) || []; } catch { return []; }
+}
+
+async function claudeAgent({ system, messages, tools, maxTokens = 4096, effort = 'medium' }) {
+  const c = getClient(); if (!c) return null;
+  return c.messages.create({ model: CLAUDE_MODEL, max_tokens: maxTokens, output_config: { effort }, system, tools, messages });
+}
+
+async function callGemini(system, user, opts = {}) {
+  // OpenRouter를 쓰는 설치에선 '완성도 관점'도 OpenRouter 모델로 처리
+  if (provider() === 'openrouter') { try { return await orText(system, user, opts); } catch (e) { console.warn('[ai] OpenRouter(gemini역할) 실패:', e.message); return null; } }
+  const key = geminiKey(); if (!key) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+  const base = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents: [{ role: 'user', parts: [{ text: user }] }],
+  };
+  const maxTok = opts.maxTokens || 800;
+  const attempts = [
+    { maxOutputTokens: maxTok, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
+    { maxOutputTokens: maxTok + 2500, temperature: 0.7 },
+  ];
+  let lastErr = 'unknown';
+  for (const gc of attempts) {
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...base, generationConfig: gc }) });
+    if (r.ok) {
+      const j = await r.json();
+      const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
+      if (text) return text;
+      lastErr = `빈 응답(finish=${j.candidates?.[0]?.finishReason})`;
+      continue;
+    }
+    lastErr = `${r.status}: ${(await r.text()).slice(0, 150)}`;
+    if (r.status !== 400) break;
+  }
+  throw new Error(`Gemini ${lastErr}`);
+}
+
+// 주어진 키가 실제로 유효한지 소량 호출로 테스트(저장 전 검증). 성공=true, 실패=throw.
+async function testAnthropicKey(key) {
+  if (!Anthropic) throw new Error('SDK가 없어요');
+  const c = new Anthropic({ apiKey: String(key || '').trim() });
+  await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{ role: 'user', content: 'hi' }] });
+  return true;
+}
+async function testGeminiKey(key) {
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}?key=${encodeURIComponent(String(key || '').trim())}`);
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 100)}`);
+  return true;
+}
+async function testOpenRouterKey(key, model) {
+  const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + String(key || '').trim(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: String(model || '').trim(), messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+  });
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 150)}`);
+  return true;
+}
+
+// 개인 키 설정/해제. patch: {anthropic?, gemini?, openrouter?, openrouterModel?} — ''이면 해제.
+function setKeys(patch = {}) {
+  const next = { ...personal };
+  for (const k of ['anthropic', 'gemini', 'openrouter', 'openrouterModel']) {
+    if (patch[k] !== undefined) { const v = String(patch[k] || '').trim(); if (v) next[k] = v; else delete next[k]; }
+  }
+  personal = next; savePersonal(personal);
+  client = null; clientKey = null;
+}
+
+function status() {
+  const p = provider();
+  return {
+    claude: p !== 'none',              // Claude 역할(팀장/에이전트)이 가능한가
+    gemini: !!geminiKey() || p === 'openrouter',
+    claudeModel: p === 'openrouter' ? openrouterModel() : CLAUDE_MODEL,
+    geminiModel: GEMINI_MODEL,
+    provider: p,
+    usingPersonal: !!personal.anthropic,
+    usingPersonalGemini: !!personal.gemini,
+    usingOpenRouter: p === 'openrouter',
+    openrouterModel: openrouterModel() || null,
+    sharedAvailable: !!process.env.ANTHROPIC_API_KEY,
+  };
+}
+
+module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, status, CLAUDE_MODEL, GEMINI_MODEL };

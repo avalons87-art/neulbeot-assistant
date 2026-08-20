@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>늘벗이 팀 · 세종늘벗학교 AI 비서</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="app">
+    <header id="topbar">
+      <div class="brand">🌱 늘벗이 팀</div>
+      <div class="info">
+        <span id="todaydate">—</span>
+        <span id="nextevent">—</span>
+        <span id="aistatus" class="badge">—</span>
+        <span id="keybadge" class="badge who" title="API 키 설정(클릭)">🔑 —</span>
+        <span id="whoami" class="badge who" title="사용자 전환(클릭)">👤 —</span>
+      </div>
+    </header>
+
+    <main id="stage">
+      <canvas id="scene"></canvas>
+
+      <!-- 산출물 패널 -->
+      <div id="deliverable" class="overlay">
+        <div class="card">
+          <div class="card-head">
+            <span id="deliv-title">산출물</span>
+            <div class="card-btns">
+              <button id="deliv-download" hidden>⬇️ 다운로드</button>
+              <button id="deliv-save">💾 업무 폴더에 저장</button>
+              <button id="deliv-copy">복사</button>
+              <button id="deliv-close">닫기</button>
+            </div>
+          </div>
+          <pre id="deliv-body"></pre>
+        </div>
+      </div>
+
+      <!-- 학사일정 불러오기 -->
+      <div id="schedpanel" class="overlay">
+        <div class="card" style="max-width:600px;">
+          <div class="card-head">
+            <span>📅 학사일정 불러오기</span>
+            <div class="card-btns"><button id="sched-close">닫기</button></div>
+          </div>
+          <div class="key-body">
+            <div id="sched-status" class="key-status">—</div>
+            <p class="key-lead">우리 학교 학사일정을 <b>붙여넣거나 파일(PDF/텍스트)에서 가져오면</b>, AI가 날짜·행사로 정리해서 앱 전체가 그 일정을 따르게 돼요. (HWP는 한글에서 열어 전체 복사→붙여넣기)</p>
+            <div class="sched-tools">
+              <button id="sched-fromfile">📄 파일에서 가져오기</button>
+              <input type="file" id="schedfile" accept=".pdf,.txt,.md,.csv" hidden />
+            </div>
+            <textarea id="sched-text" placeholder="여기에 학사일정을 붙여넣으세요 (예: 3.6 종업식 / 3.30~4.3 마중기간 / 4.6 입교식 ...)"></textarea>
+            <div class="key-btns">
+              <button id="sched-import">이 내용으로 학사일정 설정</button>
+              <button id="sched-reset">내장 일정으로 되돌리기</button>
+            </div>
+            <div class="key-hint">📌 불러온 일정은 이 컴퓨터에 저장돼요(schedule.json). AI 키가 있어야 정리돼요.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- API 키 설정 -->
+      <div id="keypanel" class="overlay">
+        <div class="card" style="max-width:520px;">
+          <div class="card-head">
+            <span>🔑 API 키 설정</span>
+            <div class="card-btns"><button id="key-close">닫기</button></div>
+          </div>
+          <div class="key-body">
+            <div id="key-status" class="key-status">—</div>
+            <p class="key-lead">공유(한도) 키로 쓰다가, 필요하면 <b>내 개인 키</b>를 넣어 한도 없이 쓸 수 있어요.</p>
+
+            <details class="key-guide">
+              <summary>❓ 내 키는 어디서 받나요? (클릭해서 펼치기)</summary>
+              <div class="key-guide-body">
+                <div class="kg-title">🔵 Claude 키 (필수)</div>
+                <ol>
+                  <li>아래 버튼으로 콘솔을 열고 <b>로그인</b></li>
+                  <li><b>Create Key</b> → 이름 아무거나 → 만들기</li>
+                  <li><code>sk-ant-…</code> 로 시작하는 키를 <b>그 자리에서 복사</b> (한 번만 보여요)</li>
+                  <li><b>Billing</b>(결제)에 카드/크레딧 등록 — 안 하면 쓸 때 오류 나요</li>
+                </ol>
+                <a class="kg-link" href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">→ Claude 키 발급 페이지 열기</a>
+
+                <div class="kg-title">🟢 Gemini 키 (선택 · 무료 등급 있음)</div>
+                <ol>
+                  <li>구글 로그인 → <b>API 키 만들기</b> → 복사</li>
+                </ol>
+                <a class="kg-link" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">→ Gemini 키 발급 페이지 열기</a>
+
+                <p class="kg-foot">복사한 키를 아래 칸에 붙여넣고 <b>"저장하고 내 키 쓰기"</b>를 누르면 끝이에요.</p>
+              </div>
+            </details>
+
+            <label>Claude 키</label>
+            <input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" />
+            <label>Gemini 키 <span class="opt">(선택)</span></label>
+            <input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" />
+
+            <div class="or-sep">또는 — OpenRouter 키 하나로 (여러 모델 통합)</div>
+            <label>OpenRouter 키 <span class="opt">(넣으면 위 두 키 대신 이걸로 전부 처리)</span></label>
+            <input id="key-openrouter" type="password" placeholder="sk-or-v1-..." autocomplete="off" />
+            <label>OpenRouter 모델 <span class="opt">(<a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a> 참고)</span></label>
+            <input id="key-ormodel" type="text" placeholder="anthropic/claude-sonnet-4.5" autocomplete="off" />
+
+            <div class="key-btns">
+              <button id="key-save">저장하고 내 키 쓰기</button>
+              <button id="key-reset">공유 키로 되돌리기</button>
+            </div>
+            <div class="key-hint">🔒 개인 키는 <b>이 컴퓨터에만</b> 저장돼요(keys.json). 콘솔: platform.claude.com / aistudio.google.com</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 폴더 선택창 (탐색기식) -->
+      <div id="folderpick" class="overlay">
+        <div class="card" style="max-width:560px;">
+          <div class="card-head">
+            <span>📂 업무 폴더 선택</span>
+            <div class="card-btns">
+              <button id="pick-select">✅ 이 폴더 선택</button>
+              <button id="pick-clear" title="폴더 지정 해제">해제</button>
+              <button id="pick-close">닫기</button>
+            </div>
+          </div>
+          <div class="pick-path" id="pick-path">—</div>
+          <div id="pick-list"></div>
+        </div>
+      </div>
+
+      <!-- 업무 폴더 브라우저 -->
+      <div id="filepanel" class="overlay">
+        <div class="card">
+          <div class="card-head">
+            <span>📁 업무 폴더</span>
+            <div class="card-btns">
+              <button id="folder-set" title="내 업무 폴더 경로 설정/변경">📂 폴더 설정</button>
+              <label class="docs-toggle"><input type="checkbox" id="docs-only" checked /> 문서만</label>
+              <input id="file-search" placeholder="파일 검색…" autocomplete="off" />
+              <button id="file-close">닫기</button>
+            </div>
+          </div>
+          <div id="file-body">
+            <div id="file-list"></div>
+            <div id="file-preview"><div class="preview-empty">파일을 클릭하면 내용 미리보기 / 참고 첨부</div></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <section id="dock">
+      <div class="quickbar">
+        <button class="quick" data-q="오늘 일정 뭐야?">오늘 일정</button>
+        <button class="quick" data-q="이번 주 일정 알려줘">이번 주</button>
+        <button class="quick" data-q="다가오는 마감 알려줘">마감</button>
+        <button class="quick" data-q="다음 일정 뭐야?">다음 일정</button>
+        <button id="schedbtn" class="quick">📅 일정 불러오기</button>
+        <button id="uploadbtn" class="quick">⬆️ 파일 올리기</button>
+        <button id="filesbtn" class="quick folder">📁 업무 폴더</button>
+        <button id="resetbtn" class="quick reset" title="이전 초안·대화 기억을 비우고 새로 시작">🔄 새 작업</button>
+        <button id="updatebtn" class="quick" title="최신 버전으로 업데이트" hidden>🔃 업데이트</button>
+        <input type="file" id="fileup" accept=".pdf,.txt,.md,.csv,.json,.html,.htm,.xml,.log" hidden />
+      </div>
+      <div id="chatlog"></div>
+      <div id="refrow" hidden>📎 참고: <b id="refname"></b> <button id="refclear" title="참고 해제">✕</button></div>
+      <div class="inputrow">
+        <input id="chatinput" type="text" placeholder="말 걸기(오늘 일정 뭐야?) 또는 업무 입력 후 '팀에게 맡기기'" autocomplete="off" />
+        <button id="sendbtn" title="팀장에게 짧게 물어보기">보내기</button>
+        <button id="teambtn" title="입력한 업무를 팀 회의로 진행">🏢 팀에게 맡기기</button>
+      </div>
+      <div class="hint">💡 팀장이 <b>대화를 기억하며 이어서</b> 일해요. 문서를 만든 뒤 "더 정중하게", "분량 줄여줘"라고 이어 말하면 그대로 수정돼요. 필요하면 팀장이 <b>업무 폴더를 스스로 찾아</b> 참고합니다. &nbsp;|&nbsp; <b>🔄 새 작업</b>으로 기억 초기화.</div>
+    </section>
+
+    <!-- 처음 사용 온보딩 마법사 -->
+    <div id="wizard">
+      <div class="wiz-card">
+        <div class="wiz-head">
+          <div class="wiz-logo">🌱 늘벗이 첫 설정</div>
+          <div class="wiz-steps">
+            <span class="wstep" data-s="1">① 이름</span>
+            <span class="wstep" data-s="2">② 학사일정</span>
+            <span class="wstep" data-s="3">③ 업무 폴더</span>
+            <span class="wstep" data-s="4">④ 업무 확인</span>
+          </div>
+        </div>
+        <div class="wiz-body">
+          <!-- ① 이름 -->
+          <section class="wpanel" data-s="1">
+            <h2>처음 오셨네요! 이름부터 알려주세요 🌱</h2>
+            <p>늘벗이가 이 이름으로 선생님을 기억하고, 설정을 저장해요.</p>
+            <input id="wiz-name" placeholder="예: 신현종" autocomplete="off" />
+            <div class="wiz-msg" id="wiz-name-msg"></div>
+            <div class="wiz-nav"><span></span><button class="wnext-primary" id="wiz-name-next">다음 →</button></div>
+          </section>
+
+          <!-- ② 학사일정 -->
+          <section class="wpanel" data-s="2" hidden>
+            <h2>학사일정을 올려주세요 <span class="opt">(PDF·텍스트)</span></h2>
+            <p>우리 학교 학사일정 파일을 올리면, 늘벗이가 <b>날짜·행사로 정리</b>해서 앱 전체가 그 일정을 따라요.<br>한글(HWP)은 한글에서 열어 <b>전체 복사(Ctrl+A→Ctrl+C) → 아래 칸에 붙여넣기</b> 하면 돼요.</p>
+            <div class="wiz-row">
+              <button id="wiz-schedfile-btn">📄 파일에서 가져오기(PDF)</button>
+              <input type="file" id="wiz-schedfile" accept=".pdf,.txt,.md,.csv" hidden />
+            </div>
+            <textarea id="wiz-schedtext" placeholder="여기에 학사일정을 붙여넣으세요 (예: 3.30~4.3 마중기간 / 4.6 입교식 / 7.24 방학식 ...)"></textarea>
+            <div class="wiz-msg" id="wiz-sched-msg"></div>
+            <div class="wiz-nav">
+              <button class="wback" data-back="1">← 이전</button>
+              <div class="wiz-nav-r">
+                <button class="wskip" data-next="3">건너뛰기(기본 일정)</button>
+                <button class="wnext-primary" id="wiz-sched-apply">이 일정으로 설정 →</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ③ 업무 폴더 -->
+          <section class="wpanel" data-s="3" hidden>
+            <h2>업무 폴더를 골라주세요 📂</h2>
+            <p>선생님 업무 자료가 든 폴더를 지정하면, 늘벗이가 <b>기존 문서를 참고</b>하고 결과물을 그 안에 저장해요.</p>
+            <div class="wiz-pick">
+              <div class="pick-path" id="wiz-pick-path">—</div>
+              <div id="wiz-pick-list"></div>
+            </div>
+            <div class="wiz-msg" id="wiz-folder-msg"></div>
+            <div class="wiz-nav">
+              <button class="wback" data-back="2">← 이전</button>
+              <div class="wiz-nav-r">
+                <button class="wskip" data-next="4">건너뛰기</button>
+                <button class="wnext-primary" id="wiz-folder-apply">이 폴더로 설정 →</button>
+              </div>
+            </div>
+          </section>
+
+          <!-- ④ 업무 확인 -->
+          <section class="wpanel" data-s="4" hidden>
+            <h2>늘벗이가 파악한 선생님 업무예요 🔎</h2>
+            <p>맞는지 확인하고, <b>틀리거나 빠진 게 있으면 자유롭게 고쳐주세요.</b> 이 내용을 기억하고 일할게요.</p>
+            <div class="wiz-msg" id="wiz-understand-load">🌱 폴더와 일정을 살펴보는 중…</div>
+            <textarea id="wiz-understand" hidden></textarea>
+            <div class="wiz-nav">
+              <button class="wback" data-back="3">← 이전</button>
+              <div class="wiz-nav-r">
+                <button id="wiz-understand-redo">🔄 다시 파악</button>
+                <button class="wnext-primary" id="wiz-finish">맞아요, 시작할게요 🌱</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/sprites.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/chat.js"></script>
+</body>
+</html>

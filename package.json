@@ -1,0 +1,17 @@
+{
+  "name": "neulbeot-assistant",
+  "version": "0.1.0",
+  "description": "세종늘벗학교 픽셀 캐릭터 AI 비서 (늘벗이)",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node --use-system-ca src/server.js",
+    "dev": "node --watch --use-system-ca src/server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.68.0",
+    "adm-zip": "^0.6.0",
+    "express": "^4.19.2",
+    "pdf-parse": "^1.1.1",
+    "pptxgenjs": "^4.0.1"
+  }
+}
