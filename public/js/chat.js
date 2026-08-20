@@ -519,7 +519,7 @@
     const btn = $('wiz-folder-apply'); btn.disabled = true;
     try {
       const d = await (await fetch('/api/folder?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, folder: wizPickCurrent }) })).json();
-      if (d.ok) { msg.textContent = '✅ 업무 폴더로 설정했어요: ' + d.folder; msg.className = 'wiz-msg ok'; setTimeout(() => wizGo(4), 800); }
+      if (d.ok) { analyzed = false; msg.textContent = '✅ 업무 폴더로 설정했어요: ' + d.folder; msg.className = 'wiz-msg ok'; setTimeout(() => wizGo(4), 800); }
       else { msg.textContent = (d.error || '설정 실패'); msg.className = 'wiz-msg err'; }
     } catch { msg.textContent = '설정 중 문제가 생겼어요.'; msg.className = 'wiz-msg err'; }
     finally { btn.disabled = false; }
@@ -546,6 +546,9 @@
     setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱`), 400);
     btn.disabled = false;
   });
+
+  // 🧭 첫 설정 — 언제든 마법사 다시 열기(기존 이름/폴더/일정은 그대로, 다시 확인·변경 가능)
+  $('setupbtn').addEventListener('click', openWizard);
 
   // ── 부팅: 이름이 아직 없으면(처음 사용) 마법사, 있으면 바로 시작 ──
   if (UID) { localStorage.setItem('nb_onboarded', '1'); startApp(); }
