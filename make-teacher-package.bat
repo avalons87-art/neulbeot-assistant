@@ -38,9 +38,12 @@ if exist "%SRC%\teacher-keys.bat" (
   echo   [!] teacher-keys.bat NOT found. Teachers would run in demo mode.
 )
 
-REM Zip it up
+REM Let antivirus/indexer settle on freshly-copied files (avoids incomplete zip)
+ping -n 4 127.0.0.1 >nul
+
+REM Zip it up (robust .NET method) and verify the shared key made it inside
 if exist "%ZIP%" del /q "%ZIP%"
-powershell -NoProfile -Command "Compress-Archive -Path (Join-Path $env:DEST '*') -DestinationPath $env:ZIP -Force"
+powershell -NoProfile -Command "Add-Type -AssemblyName System.IO.Compression.FileSystem; try { [System.IO.Compression.ZipFile]::CreateFromDirectory($env:DEST, $env:ZIP, 'Optimal', $false) } catch { Write-Host ('  [!] ZIP FAILED: ' + $_.Exception.Message); Write-Host '  [!] Close all running Neulbeot server windows, then run this again.'; exit 1 }; $z=[System.IO.Compression.ZipFile]::OpenRead($env:ZIP); $n=$z.Entries.Where({$_.FullName -eq 'my-keys.bat'}).Count; $z.Dispose(); if($n -ne 1){ Write-Host '  [!] WARNING: my-keys.bat NOT in zip - teachers would run in DEMO mode. Close servers and rebuild.' } else { Write-Host '  - Zip verified: shared key included' }"
 
 echo.
 echo ===============================================
