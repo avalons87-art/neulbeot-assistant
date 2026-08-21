@@ -238,6 +238,32 @@ function moveFile(dir, from, to) {
   return { rel: dstRel };
 }
 
+// 재귀 복사(직접 구현 — fs.cpSync 가 윈도우/Node에서 세그폴트 내는 경우가 있어 회피).
+function copyRecursive(src, dst) {
+  const st = fs.statSync(src);
+  if (st.isDirectory()) {
+    fs.mkdirSync(dst, { recursive: true });
+    for (const name of fs.readdirSync(src)) copyRecursive(path.join(src, name), path.join(dst, name));
+  } else {
+    fs.copyFileSync(src, dst);
+  }
+}
+
+// 파일/폴더 복사 (원본은 그대로 둠). to 가 기존 폴더면 그 안으로 복사.
+function copyFile(dir, from, to) {
+  const src = safeResolve(dir, from);
+  if (!fs.existsSync(src)) throw new Error('원본이 없어요: ' + from);
+  let dstRel = String(to || '').replace(/\\/g, '/');
+  const tryAbs = safeResolve(dir, dstRel);
+  if (fs.existsSync(tryAbs) && fs.statSync(tryAbs).isDirectory()) dstRel = dstRel.replace(/\/+$/, '') + '/' + path.basename(src);
+  const dst = safeResolve(dir, dstRel);
+  if (fs.existsSync(dst)) throw new Error('같은 이름이 이미 있어요: ' + dstRel);
+  fs.mkdirSync(path.dirname(dst), { recursive: true });
+  const isDir = fs.statSync(src).isDirectory();
+  copyRecursive(src, dst);
+  return { rel: dstRel, isDir };
+}
+
 function createFolder(dir, rel) {
   const abs = safeResolve(dir, rel);
   fs.mkdirSync(abs, { recursive: true });
@@ -274,4 +300,4 @@ function deleteToTrash(dir, rel) {
   return { rel: `${TRASH_SUBDIR}/${path.basename(dst)}` };
 }
 
-module.exports = { WORK_DIR, OUTPUT_FALLBACK, exists, listFiles, listSubdirs, listDrives, isDriveRoot, analyzeStructure, readText, extractBuffer, saveDeliverable, savePptx, slidesToText, safeResolve, moveFile, createFolder, editTextFile, deleteToTrash };
+module.exports = { WORK_DIR, OUTPUT_FALLBACK, exists, listFiles, listSubdirs, listDrives, isDriveRoot, analyzeStructure, readText, extractBuffer, saveDeliverable, savePptx, slidesToText, safeResolve, copyFile, moveFile, createFolder, editTextFile, deleteToTrash };

@@ -22,14 +22,15 @@ const SYSTEM = `너는 '늘벗이', 세종늘벗학교(대안교육위탁기관)
 - present_deliverable: 완성한 문서를 사용자 화면(산출물 패널)에 띄운다. 문서를 완성하면 반드시 호출.
 - save_draft: 완성 초안을 업무 폴더에 .txt 로 저장(사용자가 원하거나 확정되면).
 - create_pptx: 발표자료를 요청받으면 슬라이드 구성을 짜서 이 도구로 '진짜 파워포인트(.pptx) 파일'을 만들어 업무 폴더에 저장한다. (텍스트 구성안만 주지 말고 실제 파일을 만들어라.)
-- move_file: 업무 폴더 안에서 파일/폴더 이름변경·이동(정리). create_folder: 새 폴더 만들기.
+- copy_file: 업무 폴더 안에서 파일/폴더 복사(원본 보존). **파일 정리·모으기의 기본은 복사다.** create_folder: 새 폴더 만들기.
+- move_file: 이름변경·이동(원본이 사라짐). 사용자가 "이동/옮겨/이름 바꿔"처럼 명시할 때만 쓴다.
 - edit_file: 텍스트(.txt/.md 등) 파일 내용 수정(원본은 자동 백업됨). delete_to_trash: 파일을 늘벗이_휴지통으로 이동(진짜 삭제 아님).
 
 ⚠️ 파일을 바꾸는 도구(move_file/edit_file/delete_to_trash)는 실행 전 사용자에게 자동으로 승인창이 떠서, 승인해야만 실제로 바뀐다. 그러니 자신 있게 제안하되, 한 번에 너무 많이 바꾸지 말고 명확한 것만. 사용자가 거부하면 존중하고 다른 방법을 제안하라.
 
 문서를 만드는 흐름(스스로 판단해 밟아라): 관련자료 검색·열람 → (필요시) 기획회의 → 작성 → present_deliverable → (원하면) save_draft.
 수정 요청이면 이전 초안을 이어서 고치고 다시 present_deliverable 한다. 완전히 새로 쓰지 마라.
-파일 정리·수정 요청이면 무엇을 어떻게 바꿀지 먼저 짧게 말하고 관련 도구를 호출하라(승인은 자동으로 사용자가 함).
+파일 정리·모으기 요청이면 **기본은 복사(copy_file, 원본 보존)** 다. 원본을 없애는 이동(move_file)은 사용자가 "이동/옮겨"라고 분명히 말할 때만 쓴다. 무엇을 어떻게 할지 먼저 짧게 말하고 도구를 호출하라(승인은 자동으로 사용자가 함).
 
 규칙: 학생 이름은 반드시 'OO'. 연도는 '2026학년도'. 산출물은 한국 학교 행정 문서 형식으로 바로 제출 가능하게.
 말투: 팀장답게 짧고 다정하게. 긴 설명보다 행동으로. 사용자에게 하는 말은 1~2문장.`;
@@ -82,8 +83,13 @@ const TOOLS = [
     },
   },
   {
+    name: 'copy_file',
+    description: '업무 폴더 안에서 파일/폴더를 복사한다(원본은 그대로 둠). 파일 정리·모으기의 기본 동작. to 가 기존 폴더면 그 안으로 복사. 실행 전 사용자 승인 필요.',
+    input_schema: { type: 'object', properties: { from: { type: 'string', description: '원본 상대경로' }, to: { type: 'string', description: '복사할 경로(새 이름) 또는 대상 폴더' } }, required: ['from', 'to'] },
+  },
+  {
     name: 'move_file',
-    description: '업무 폴더 안에서 파일/폴더를 이름변경하거나 다른 폴더로 옮긴다(정리). to 가 기존 폴더면 그 안으로 이동. 실행 전 사용자 승인 필요.',
+    description: '업무 폴더 안에서 파일/폴더를 이름변경하거나 다른 폴더로 옮긴다(원본이 사라짐). 사용자가 "이동/옮겨"라고 명시할 때만 사용. to 가 기존 폴더면 그 안으로 이동. 실행 전 사용자 승인 필요.',
     input_schema: { type: 'object', properties: { from: { type: 'string', description: '원본 상대경로' }, to: { type: 'string', description: '새 경로(이름변경) 또는 대상 폴더' } }, required: ['from', 'to'] },
   },
   {
@@ -166,9 +172,17 @@ async function execTool(name, input, emit, store, folder) {
     }
 
     // ── 파일 변경(승인 필요) ──
+    if (name === 'copy_file') {
+      if (!folder) return '설정된 업무 폴더가 없어요.';
+      const ok = await confirm.request(emit, `📑 "${input.from}" → "${input.to}" 로 복사할까요? (원본은 그대로 둬요)`);
+      if (ok !== 'approve') return '사용자가 거부했어요. 실행하지 않음.';
+      const r = workfiles.copyFile(folder, input.from, input.to);
+      emit({ type: 'turn', role: 'work', text: `✅ 복사했어요: ${r.rel} (원본 유지)` });
+      return `복사 완료: ${r.rel} (원본 보존)`;
+    }
     if (name === 'move_file') {
       if (!folder) return '설정된 업무 폴더가 없어요.';
-      const ok = await confirm.request(emit, `📁 "${input.from}" → "${input.to}" 로 옮길까요?`);
+      const ok = await confirm.request(emit, `📁 "${input.from}" → "${input.to}" 로 옮길까요? (원본이 사라져요)`);
       if (ok !== 'approve') return '사용자가 거부했어요. 실행하지 않음.';
       const r = workfiles.moveFile(folder, input.from, input.to);
       emit({ type: 'turn', role: 'work', text: `✅ 옮겼어요: ${r.rel}` });
@@ -202,7 +216,7 @@ async function execTool(name, input, emit, store, folder) {
   }
 }
 
-const FILE_TOOLS = ['search_files', 'read_document', 'move_file', 'create_folder', 'edit_file', 'delete_to_trash'];
+const FILE_TOOLS = ['search_files', 'read_document', 'copy_file', 'move_file', 'create_folder', 'edit_file', 'delete_to_trash'];
 
 // 에이전트 실행 (한 번의 사용자 요청 → end_turn 까지 루프). opts.store=세션, opts.folder=업무폴더(null이면 폴더도구 제외).
 async function run(userText, emit, opts = {}) {
