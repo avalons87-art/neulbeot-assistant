@@ -171,6 +171,46 @@ async function callGemini(system, user, opts = {}) {
   throw new Error(`Gemini ${lastErr}`);
 }
 
+// 손글씨/이미지 → 텍스트(OCR). 비용상 Gemini 우선(무료등급·한글 손글씨 강함), 없으면 Claude, 그다음 OpenRouter.
+const OCR_INSTRUCTION = `이 이미지는 학생이 손으로 쓴 글(수행평가 답안 등)입니다.
+- 보이는 내용을 그대로 텍스트로 옮겨 적으세요. 맞춤법·오탈자는 고치지 말고 쓴 그대로.
+- 표는 표 형태를 최대한 유지(간단한 줄/칸 구분).
+- 알아보기 힘든 글자는 [?] 로 표시.
+- 학생 이름이 보이면 이름은 'OO'로 가리세요(개인정보 보호).
+- 옮긴 내용만 출력하고, 설명이나 머리말은 붙이지 마세요.`;
+async function transcribeImage(imageB64, mediaType = 'image/jpeg', opts = {}) {
+  const instruction = opts.instruction || OCR_INSTRUCTION;
+  const maxTokens = opts.maxTokens || 2500;
+  // 1) Gemini (저렴)
+  if (geminiKey()) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey()}`;
+      const body = { contents: [{ role: 'user', parts: [{ inlineData: { mimeType: mediaType, data: imageB64 } }, { text: instruction }] }], generationConfig: { maxOutputTokens: maxTokens, temperature: 0 } };
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (r.ok) {
+        const j = await r.json();
+        const t = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
+        if (t) return { text: t, model: 'gemini' };
+      } else { console.warn('[ai] Gemini OCR', r.status, (await r.text()).slice(0, 120)); }
+    } catch (e) { console.warn('[ai] Gemini OCR 실패:', e.message); }
+  }
+  // 2) Claude 비전
+  const c = getClient();
+  if (c) {
+    const res = await c.messages.create({
+      model: CLAUDE_MODEL, max_tokens: maxTokens,
+      messages: [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mediaType, data: imageB64 } }, { type: 'text', text: instruction }] }],
+    });
+    return { text: (res.content.find((b) => b.type === 'text')?.text || '').trim(), model: 'claude' };
+  }
+  // 3) OpenRouter 비전
+  if (openrouterKey() && openrouterModel()) {
+    const j = await orChat([{ role: 'user', content: [{ type: 'text', text: instruction }, { type: 'image_url', image_url: { url: `data:${mediaType};base64,${imageB64}` } }] }], { maxTokens });
+    return { text: (j.choices?.[0]?.message?.content || '').trim(), model: 'openrouter' };
+  }
+  throw new Error('이미지를 읽을 AI 키가 없어요. Gemini 또는 Claude 키를 넣어주세요(🔑).');
+}
+
 // 주어진 키가 실제로 유효한지 소량 호출로 테스트(저장 전 검증). 성공=true, 실패=throw.
 async function testAnthropicKey(key) {
   if (!Anthropic) throw new Error('SDK가 없어요');
@@ -219,4 +259,4 @@ function status() {
   };
 }
 
-module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, status, CLAUDE_MODEL, GEMINI_MODEL };
+module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, status, CLAUDE_MODEL, GEMINI_MODEL };

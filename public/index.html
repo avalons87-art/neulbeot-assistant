@@ -29,6 +29,7 @@
             <span id="deliv-title">산출물</span>
             <div class="card-btns">
               <button id="deliv-download" hidden>⬇️ 다운로드</button>
+              <button id="deliv-docx" title="한글(HWP)에서 바로 열리는 .docx로 저장·다운로드">📝 한글(.docx)</button>
               <button id="deliv-save">💾 업무 폴더에 저장</button>
               <button id="deliv-copy">복사</button>
               <button id="deliv-close">닫기</button>
@@ -157,8 +158,11 @@
         <button class="quick" data-q="이번 주 일정 알려줘">이번 주</button>
         <button class="quick" data-q="다가오는 마감 알려줘">마감</button>
         <button class="quick" data-q="다음 일정 뭐야?">다음 일정</button>
+        <button id="ocrbtn" class="quick" title="손글씨/수행평가 사진을 텍스트로 변환">✍️ 손글씨 변환</button>
+        <button id="checklistbtn" class="quick" title="다가오는 행사 준비 체크리스트 자동 생성">📋 행사 준비</button>
         <button id="schedbtn" class="quick">📅 일정 불러오기</button>
         <button id="uploadbtn" class="quick">⬆️ 파일 올리기</button>
+        <input type="file" id="ocrfile" accept="image/*" multiple hidden />
         <button id="filesbtn" class="quick folder">📁 업무 폴더</button>
         <button id="resetbtn" class="quick reset" title="이전 초안·대화 기억을 비우고 새로 시작">🔄 새 작업</button>
         <button id="setupbtn" class="quick" title="첫 설정 마법사 다시 열기 (이름·학사일정·업무폴더·업무확인)">🧭 첫 설정</button>

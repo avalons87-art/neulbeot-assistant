@@ -162,6 +162,36 @@ async function savePptx(dir, title, slides) {
   return { saved: file, rel, slideCount: list.length };
 }
 
+// 텍스트 본문 → 실제 워드/한글 문서(.docx) 저장. 한글(HWP)에서 바로 열려요.
+// adm-zip 으로 최소 OOXML 패키지를 직접 만든다(추가 의존성 없음).
+function saveDocx(dir, title, body) {
+  const { file, rel } = makePath(dir, title, 'docx');
+  const AdmZip = require('adm-zip');
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const FONT = '맑은 고딕';
+  const rF = `<w:rFonts w:ascii="${FONT}" w:eastAsia="${FONT}" w:hAnsi="${FONT}"/>`;
+  const paras = [];
+  // 제목(가운데, 굵게, 16pt)
+  paras.push(`<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:after="240"/></w:pPr><w:r><w:rPr>${rF}<w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr><w:t xml:space="preserve">${esc(title || '문서')}</w:t></w:r></w:p>`);
+  // 본문(11pt, 줄간격 1.5)
+  for (const ln of String(body || '').replace(/\r/g, '').split('\n')) {
+    if (!ln.trim()) { paras.push('<w:p/>'); continue; }
+    paras.push(`<w:p><w:pPr><w:spacing w:after="80" w:line="360" w:lineRule="auto"/></w:pPr><w:r><w:rPr>${rF}<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr><w:t xml:space="preserve">${esc(ln)}</w:t></w:r></w:p>`);
+  }
+  const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${paras.join('')}<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1440" w:bottom="1440" w:left="1440" w:header="720" w:footer="720" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const contentTypes = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`;
+  const relsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`;
+  const zip = new AdmZip();
+  zip.addFile('[Content_Types].xml', Buffer.from(contentTypes, 'utf8'));
+  zip.addFile('_rels/.rels', Buffer.from(relsXml, 'utf8'));
+  zip.addFile('word/document.xml', Buffer.from(documentXml, 'utf8'));
+  zip.writeZip(file);
+  return { rel, saved: file };
+}
+
 // 폴더 선택창용 — 하위 폴더 목록(폴더만, 민감·숨김 제외)
 function listSubdirs(dirPath) {
   let entries;
@@ -300,4 +330,4 @@ function deleteToTrash(dir, rel) {
   return { rel: `${TRASH_SUBDIR}/${path.basename(dst)}` };
 }
 
-module.exports = { WORK_DIR, OUTPUT_FALLBACK, exists, listFiles, listSubdirs, listDrives, isDriveRoot, analyzeStructure, readText, extractBuffer, saveDeliverable, savePptx, slidesToText, safeResolve, copyFile, moveFile, createFolder, editTextFile, deleteToTrash };
+module.exports = { WORK_DIR, OUTPUT_FALLBACK, exists, listFiles, listSubdirs, listDrives, isDriveRoot, analyzeStructure, readText, extractBuffer, saveDeliverable, savePptx, saveDocx, slidesToText, safeResolve, copyFile, moveFile, createFolder, editTextFile, deleteToTrash };

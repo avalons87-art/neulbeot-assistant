@@ -134,6 +134,66 @@
     } catch { flash('deliv-save', '저장 실패', 2000); }
   });
   function flash(id, txt, ms) { const b = $(id); const o = b.dataset.o || b.textContent; b.dataset.o = o; b.textContent = txt; clearTimeout(b._t); b._t = setTimeout(() => { b.textContent = o; b.dataset.o = ''; }, ms || 1200); }
+  // 산출물 → 한글(.docx)로 저장 후 다운로드
+  $('deliv-docx').addEventListener('click', async () => {
+    if (!lastDeliverable) return;
+    const btn = $('deliv-docx'); flash('deliv-docx', '만드는 중…', 4000);
+    try {
+      const d = await (await fetch('/api/save-docx?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, title: lastDeliverable.title, body: lastDeliverable.body }) })).json();
+      if (!d.ok) { flash('deliv-docx', '실패', 2000); addLine('lead', '한글문서 저장 실패: ' + (d.error || '')); return; }
+      flash('deliv-docx', '✅ 저장', 2000);
+      addLine('work', `한글문서(.docx)로 저장했어요: ${d.rel}${d.toFolder ? '' : ' (다운로드 폴더)'}`);
+      const res = await fetch('/api/download?uid=' + encodeURIComponent(UID) + '&path=' + encodeURIComponent(d.rel));
+      if (res.ok) { const blob = await res.blob(); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = d.rel.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000); }
+    } catch { flash('deliv-docx', '실패', 2000); }
+  });
+
+  // ── 손글씨/이미지 → 텍스트(OCR) ──
+  // 큰 사진은 브라우저에서 먼저 축소(모델 한도·비용 절감)
+  function downscaleImage(file, maxEdge) {
+    return new Promise((resolve, reject) => {
+      const img = new Image(); const url = URL.createObjectURL(file);
+      img.onload = () => {
+        let { width: w, height: h } = img;
+        const scale = Math.min(1, maxEdge / Math.max(w, h));
+        w = Math.round(w * scale); h = Math.round(h * scale);
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(cv.toDataURL('image/jpeg', 0.85).split(',')[1]); // base64만
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽지 못했어요')); };
+      img.src = url;
+    });
+  }
+  $('ocrbtn').addEventListener('click', () => $('ocrfile').click());
+  $('ocrfile').addEventListener('change', async () => {
+    const files = [...$('ocrfile').files]; $('ocrfile').value = '';
+    if (!files.length) return;
+    addLine('me', `✍️ 손글씨 사진 ${files.length}장 변환 요청`);
+    if (window.Game) Game.mascotThinking();
+    const parts = [];
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      addLine('work', `📷 ${i + 1}/${files.length} "${f.name}" 읽는 중…`);
+      try {
+        const b64 = await downscaleImage(f, 1600);
+        const d = await (await fetch('/api/ocr?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, name: f.name, data: b64 }) })).json();
+        if (d.ok) parts.push(`── ${f.name} ──\n${d.text || '(내용 없음)'}`);
+        else { parts.push(`── ${f.name} ──\n(변환 실패: ${d.error || ''})`); addLine('lead', `"${f.name}" 변환 실패: ${d.error || ''}`); }
+      } catch (e) { parts.push(`── ${f.name} ──\n(오류: ${e.message})`); }
+    }
+    const body = parts.join('\n\n');
+    addLine('lead', `손글씨 ${files.length}장을 텍스트로 옮겼어요. 아래에서 확인·수정하세요 ✍️ (한글 저장도 가능)`);
+    showDeliverable('손글씨 변환 결과', body);
+  });
+
+  // ── 행사 준비 체크리스트(다가오는 행사 기준) ──
+  $('checklistbtn').addEventListener('click', () => {
+    if (running) return;
+    input.value = '다가오는 행사와 마감을 확인해서, 가장 가까운 행사의 준비 체크리스트를 만들어줘. 준비물·담당·기한을 표로 정리하고, 세종늘벗학교 상황(대안교육위탁·재적학교 발송 등)에 맞게. 완성하면 산출물로 보여줘.';
+    runAgent('doc');
+  });
 
   // ── 업무 폴더 브라우저 ──
   let allFiles = [];
@@ -280,7 +340,7 @@
   sendBtn.addEventListener('click', () => runAgent('chat'));
   teamBtn.addEventListener('click', () => runAgent('doc'));
   input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runAgent('chat'); });
-  document.querySelectorAll('.quick:not(.folder):not(.reset)').forEach((b) => b.addEventListener('click', () => { input.value = b.dataset.q; runAgent('chat'); }));
+  document.querySelectorAll('.quick[data-q]').forEach((b) => b.addEventListener('click', () => { input.value = b.dataset.q; runAgent('chat'); }));
   $('resetbtn').addEventListener('click', async () => {
     try { await fetch('/api/reset?uid=' + encodeURIComponent(UID), { method: 'POST' }); } catch {}
     clearRef(); lastDeliverable = null;
@@ -396,6 +456,9 @@
       if (greet) setTimeout(() => {
         const hi = on.length ? `안녕하세요! 오늘은 "${on[0].title}" 있는 날이에요 🌱` : '안녕하세요 선생님! 무엇을 도와드릴까요? 🌱';
         addLine('lead', hi); if (window.Game) Game.sayMascot(hi, 'happy');
+        // 마감 임박(7일 이내) 리마인더
+        const dls = (d.deadlines || []).filter((e) => e.dday >= 0 && e.dday <= 7);
+        if (dls.length) setTimeout(() => addLine('lead', '⏰ 마감 임박 알림: ' + dls.map((e) => `${e.title} (D-${e.dday})`).join(' · ') + '\n필요하면 "○○ 준비 도와줘"라고 말씀해 주세요.'), 1200);
       }, 900);
     }).catch(() => {});
   }

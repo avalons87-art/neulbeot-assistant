@@ -299,6 +299,30 @@ app.post('/api/save', (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
 
+// 산출물을 한글/워드 문서(.docx)로 저장 (한글에서 바로 열림)
+app.post('/api/save-docx', (req, res) => {
+  const { title, body } = req.body || {};
+  if (!body) return res.status(400).json({ ok: false, error: '저장할 내용이 없어요.' });
+  const base = folderFor(req) || workfiles.OUTPUT_FALLBACK;
+  const toFolder = !!folderFor(req);
+  try {
+    const out = workfiles.saveDocx(base, title, body);
+    res.json({ ok: true, ...out, toFolder });
+  } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
+// 손글씨/이미지 → 텍스트(OCR). 비전 모델로 옮겨 적음. 이미지 1장(base64).
+app.post('/api/ocr', async (req, res) => {
+  const { name, data } = req.body || {};
+  if (!data) return res.status(400).json({ ok: false, error: '이미지가 비었어요.' });
+  const m = String(name || '').toLowerCase().match(/\.(jpe?g|png|webp|gif)$/);
+  const mt = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }[m ? m[1] : 'jpg'] || 'image/jpeg';
+  try {
+    const out = await ai.transcribeImage(String(data), mt, {});
+    res.json({ ok: true, text: out.text || '', model: out.model });
+  } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
+});
+
 // 일정
 app.get('/api/schedule', (req, res) => {
   const t = today(req);
