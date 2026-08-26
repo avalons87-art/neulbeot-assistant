@@ -136,9 +136,29 @@ async function extractSchedule(text, opts = {}) {
   try { return (JSON.parse(m[0]).events) || []; } catch { return []; }
 }
 
+// 프롬프트 캐싱 — 매 스텝 다시 보내는 앞부분(도구+시스템, 그리고 누적 대화)을 캐시해 비용 절감.
+//   시스템 블록에 cache_control → 도구+시스템 프리픽스 캐시(가장 큰 고정분).
+//   마지막 메시지 끝에 cache_control(요청 시점에만, 원본 messages 는 안 건드림) → 누적 대화 재사용.
+function withCacheBreakpoint(messages) {
+  if (!messages || !messages.length) return messages;
+  const out = messages.slice();
+  const last = out[out.length - 1];
+  let content = last.content;
+  if (typeof content === 'string') content = [{ type: 'text', text: content }];
+  else if (Array.isArray(content)) content = content.map((b) => ({ ...b }));
+  else return messages;
+  if (content.length) content[content.length - 1] = { ...content[content.length - 1], cache_control: { type: 'ephemeral' } };
+  out[out.length - 1] = { ...last, content };
+  return out;
+}
 async function claudeAgent({ system, messages, tools, maxTokens = 4096, effort = 'medium' }) {
   const c = getClient(); if (!c) return null;
-  return c.messages.create({ model: CLAUDE_MODEL, max_tokens: maxTokens, output_config: { effort }, system, tools, messages });
+  const sys = typeof system === 'string' ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system;
+  const res = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: maxTokens, output_config: { effort }, system: sys, tools, messages: withCacheBreakpoint(messages) });
+  const u = res.usage || {};
+  if (process.env.NB_LOG_CACHE === '1')
+    console.log(`[cache] read=${u.cache_read_input_tokens || 0} write=${u.cache_creation_input_tokens || 0} in=${u.input_tokens || 0}`);
+  return res;
 }
 
 async function callGemini(system, user, opts = {}) {
