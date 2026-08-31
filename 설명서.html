@@ -1,0 +1,357 @@
+<title>늘벗이 설치 설명서</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Noto+Sans+KR:wght@400;500;700;900&display=swap">
+<style>
+  :root {
+    --ground: #f5f9f1;
+    --surface: #ffffff;
+    --surface-2: #eef5ea;
+    --ink: #1b2a20;
+    --ink-soft: #45573f;
+    --ink-faint: #7c8c75;
+    --green: #2f5d3a;
+    --green-bright: #4e9a5a;
+    --green-lite: #8ad48f;
+    --line: #d9e6d5;
+    --line-strong: #c3d6bd;
+    --warn-bg: #fbf1d8;
+    --warn-ink: #7a5713;
+    --warn-line: #eccf84;
+    --alert-bg: #f8e4dd;
+    --alert-ink: #9a3b23;
+    --alert-line: #e6b3a2;
+    --shadow: 0 1px 2px rgba(20,40,25,.05), 0 8px 30px rgba(20,50,28,.06);
+    --radius: 14px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131c16;
+      --surface: #1a251d;
+      --surface-2: #202e24;
+      --ink: #e7f1e4;
+      --ink-soft: #b3c6ac;
+      --ink-faint: #7f947a;
+      --green: #7cc487;
+      --green-bright: #9bdca4;
+      --green-lite: #2f5d3a;
+      --line: #2c3b2e;
+      --line-strong: #3a4d3c;
+      --warn-bg: #33290f;
+      --warn-ink: #f0cf86;
+      --warn-line: #574421;
+      --alert-bg: #38211a;
+      --alert-ink: #f0b7a3;
+      --alert-line: #5e3527;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #131c16;
+    --surface: #1a251d;
+    --surface-2: #202e24;
+    --ink: #e7f1e4;
+    --ink-soft: #b3c6ac;
+    --ink-faint: #7f947a;
+    --green: #7cc487;
+    --green-bright: #9bdca4;
+    --green-lite: #2f5d3a;
+    --line: #2c3b2e;
+    --line-strong: #3a4d3c;
+    --warn-bg: #33290f;
+    --warn-ink: #f0cf86;
+    --warn-line: #574421;
+    --alert-bg: #38211a;
+    --alert-ink: #f0b7a3;
+    --alert-line: #5e3527;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 34px rgba(0,0,0,.35);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Noto Sans KR", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.72;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 40px 22px 90px; }
+
+  /* ── Header ── */
+  header.hero {
+    background: linear-gradient(160deg, var(--green) 0%, #244a2e 100%);
+    color: #eafff0;
+    border-radius: 20px;
+    padding: 34px 32px 30px;
+    box-shadow: var(--shadow);
+    position: relative;
+    overflow: hidden;
+  }
+  header.hero::after {
+    content: "🌱";
+    position: absolute;
+    right: -12px; bottom: -26px;
+    font-size: 150px; opacity: .12; transform: rotate(-8deg);
+  }
+  .eyebrow {
+    font-size: 12.5px; font-weight: 700; letter-spacing: .22em;
+    color: var(--green-lite); text-transform: uppercase; margin: 0 0 12px;
+  }
+  header.hero h1 {
+    font-family: "Gowun Dodum", "Noto Sans KR", sans-serif;
+    font-size: clamp(26px, 6vw, 38px); line-height: 1.2; margin: 0 0 10px;
+    text-wrap: balance; font-weight: 400; position: relative; z-index: 1;
+  }
+  header.hero p { margin: 0; color: #cfe9d6; font-size: 15px; max-width: 46ch; position: relative; z-index: 1; }
+  .school { margin-top: 18px; font-size: 13px; color: #a9d3b3; position: relative; z-index: 1; }
+
+  /* ── Intro ── */
+  .lede {
+    font-size: 17px; color: var(--ink-soft); margin: 30px 2px 8px;
+    line-height: 1.75; text-wrap: pretty;
+  }
+  .lede b { color: var(--ink); font-weight: 700; }
+
+  /* ── Sections ── */
+  section { margin-top: 40px; }
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+  .sec-num {
+    font-family: "Gowun Dodum", sans-serif; font-size: 15px; font-weight: 400;
+    color: #fff; background: var(--green-bright); width: 30px; height: 30px;
+    border-radius: 9px; display: grid; place-items: center; flex: none;
+    box-shadow: 0 2px 6px rgba(47,93,58,.25);
+  }
+  :root[data-theme="dark"] .sec-num { color: #0d180f; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .sec-num { color: #0d180f; } }
+  h2 {
+    font-family: "Gowun Dodum", "Noto Sans KR", sans-serif; font-weight: 400;
+    font-size: 22px; margin: 0; color: var(--ink); text-wrap: balance;
+  }
+  .sec-sub { color: var(--ink-faint); font-size: 14px; margin: 2px 0 0 42px; }
+
+  /* ── Cards / lists ── */
+  .card {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 6px 22px; margin-top: 16px;
+    box-shadow: var(--shadow);
+  }
+  ol.steps { list-style: none; counter-reset: s; margin: 0; padding: 14px 0; }
+  ol.steps > li {
+    counter-increment: s; position: relative; padding: 12px 4px 12px 46px;
+    border-bottom: 1px solid var(--line);
+  }
+  ol.steps > li:last-child { border-bottom: none; }
+  ol.steps > li::before {
+    content: counter(s); position: absolute; left: 0; top: 11px;
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--surface-2); color: var(--green);
+    border: 1.5px solid var(--line-strong);
+    font-weight: 700; font-size: 14px; display: grid; place-items: center;
+  }
+  ol.steps b { font-weight: 700; color: var(--ink); }
+  ol.steps .muted { color: var(--ink-faint); font-size: 14px; }
+
+  ul.check { list-style: none; margin: 0; padding: 14px 0; }
+  ul.check > li {
+    position: relative; padding: 10px 2px 10px 34px;
+    border-bottom: 1px dashed var(--line);
+  }
+  ul.check > li:last-child { border-bottom: none; }
+  ul.check > li::before {
+    content: "✓"; position: absolute; left: 2px; top: 10px;
+    color: var(--green-bright); font-weight: 900; font-size: 16px;
+  }
+  ul.check b { font-weight: 700; }
+
+  code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--surface-2); color: var(--green);
+    padding: 1px 7px; border-radius: 6px; font-size: .88em;
+    border: 1px solid var(--line);
+  }
+  a { color: var(--green-bright); font-weight: 500; text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+  a:hover { border-bottom-color: var(--green-bright); }
+  .muted { color: var(--ink-faint); font-size: .92em; }
+  ul.keylist { list-style: none; margin: 10px 0 2px; padding: 0; display: grid; gap: 7px; }
+  ul.keylist > li { position: relative; padding-left: 16px; font-size: 14px; line-height: 1.5; }
+  ul.keylist > li::before { content: "•"; position: absolute; left: 2px; color: var(--green-bright); font-weight: 900; }
+
+  /* ── Callouts ── */
+  .callout {
+    border-radius: 12px; padding: 15px 18px 15px 16px; margin-top: 16px;
+    font-size: 14.5px; line-height: 1.65; border: 1px solid; display: flex; gap: 12px;
+  }
+  .callout .ic { font-size: 18px; flex: none; line-height: 1.5; }
+  .callout .bd { min-width: 0; }
+  .callout b { font-weight: 700; }
+  .callout.tip { background: var(--surface-2); border-color: var(--line-strong); color: var(--ink-soft); }
+  .callout.tip b { color: var(--green); }
+  .callout.warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn-ink); }
+  .callout.warn b { color: var(--warn-ink); }
+  .callout.important { background: var(--alert-bg); border-color: var(--alert-line); color: var(--alert-ink); }
+  .callout.important b { color: var(--alert-ink); }
+
+  /* ── Feature grid ── */
+  .features { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .feat { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: var(--shadow); }
+  .feat .fi { font-size: 20px; }
+  .feat h3 { margin: 6px 0 3px; font-size: 15px; font-weight: 700; color: var(--ink); }
+  .feat p { margin: 0; font-size: 13.5px; color: var(--ink-faint); line-height: 1.55; }
+  @media (max-width: 560px) { .features { grid-template-columns: 1fr; } }
+
+  /* ── Test prompt sample ── */
+  .prompt {
+    background: var(--surface-2); border: 1px dashed var(--line-strong);
+    border-radius: 12px; padding: 14px 16px; margin-top: 12px;
+    font-size: 14.5px; color: var(--ink-soft);
+  }
+  .prompt .q { color: var(--green); font-weight: 700; }
+
+  .divider { height: 1px; background: var(--line); margin: 44px 0 0; border: none; }
+  footer { margin-top: 34px; color: var(--ink-faint); font-size: 13px; text-align: center; line-height: 1.7; }
+  footer b { color: var(--green); }
+
+  p { margin: 12px 2px; }
+  .tight { margin-top: 6px; }
+
+  @media print {
+    body { background: #fff; font-size: 12.5px; }
+    .wrap { padding: 0; max-width: 100%; }
+    header.hero, .card, .feat, .callout { box-shadow: none; }
+    section { break-inside: avoid; }
+    a { color: inherit; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <p class="eyebrow">교사용 설치 · 사용 설명서</p>
+    <h1>늘벗이 — 학교 업무 지원 AI 비서</h1>
+    <p>내 컴퓨터에서 도는 AI 비서예요. 내 업무 폴더의 자료를 참고해 공문·안내문·계획안 초안을 만들고, 학사일정을 챙기고, 손글씨를 텍스트로 옮겨 줍니다.</p>
+    <div class="school">세종늘벗학교 · 늘벗이 팀</div>
+  </header>
+
+  <p class="lede">설치는 <b>딱 두 가지</b>—① Node.js 설치, ② <code>start-server.bat</code> 실행—이면 끝나요. 처음 켜면 <b>설정 마법사</b>가 이름·학사일정·업무폴더·API 키를 순서대로 안내합니다. 아래 순서대로만 따라오시면 됩니다.</p>
+
+  <!-- 준비물 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">✓</span><h2>먼저 준비할 것</h2></div>
+    <div class="card">
+      <ul class="check">
+        <li><b>Node.js 설치</b> — 함께 드린 설치파일(또는 <a href="https://nodejs.org" target="_blank" rel="noopener">nodejs.org</a>의 <b>LTS 버전, 22 이상</b>)을 설치하세요. 이 프로그램이 도는 엔진이에요.</li>
+        <li><b>업무 자료를 한 폴더에</b> 모아 주세요. 늘벗이는 지정한 <b>하나의 업무 폴더</b>를 참고합니다.</li>
+        <li><b>학교 업무계획 PDF</b> 한 부. PDF가 없으면 한글(HWP)에서 <b>전체 복사(Ctrl+A→C)</b>해 붙여넣어도 되지만, 표가 있으면 인식 오류가 있을 수 있어요.</li>
+        <li><b>본인 AI API 키</b> — Claude · Gemini · GPT 중 <b>하나 이상</b>. <span class="muted">공유용 키는 사용량 제한이 있어 잘 안 될 수 있어요. 개인 키를 권장합니다.</span></li>
+      </ul>
+    </div>
+    <div class="callout tip">
+      <span class="ic">🔑</span>
+      <div class="bd"><b>API 키는 어디서 받나요?</b> 아래 중 <b>하나 이상</b>만 있으면 돼요. 발급받은 키는 <b>내 컴퓨터에만</b> 저장됩니다.
+        <ul class="keylist">
+          <li><b>Claude</b> → <a href="https://platform.claude.com/settings/keys" target="_blank" rel="noopener">platform.claude.com</a> <span class="muted">(결제 등록 필요)</span></li>
+          <li><b>Gemini</b> → <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com</a> <span class="muted">(무료 등급 있음)</span></li>
+          <li><b>GPT&nbsp;(OpenAI)</b> → <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener">platform.openai.com</a></li>
+          <li><b>OpenRouter</b> → <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> <span class="muted">(키 하나로 여러 모델 · 모델 이름은 <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>)</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 알아두기 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">!</span><h2>시작 전에 꼭 알아두기</h2></div>
+    <div class="callout important">
+      <span class="ic">🌐</span>
+      <div class="bd"><b>완전한 오프라인은 아니에요.</b> 업무 <b>파일 자체는 내 컴퓨터에만</b> 있고 어디로도 올라가지 않아요. 다만 문서 작업을 할 때는 <b>AI에게 보내는 내용(질문·참고 텍스트)만</b> 인터넷으로 선택한 AI 회사(Claude/Gemini/GPT) 서버에 전송됩니다.</div>
+    </div>
+    <div class="callout warn">
+      <span class="ic">🔒</span>
+      <div class="bd"><b>개인정보는 조심.</b> 비밀번호 폴더·인증서(.cer/.key)·숨김 폴더는 <b>자동 차단</b>되고, 학생 이름은 결과물에서 <b>자동으로 OO 처리</b>돼요. 그래도 <b>AI에 보내는 내용</b>에는 민감정보가 없도록 한 번 더 살펴 주세요.</div>
+    </div>
+    <div class="callout tip">
+      <span class="ic">🗂️</span>
+      <div class="bd"><b>파일은 함부로 안 바뀌어요.</b> 파일 이동·복사·수정·삭제는 <b>화면에서 승인(✅)한 뒤에만</b> 실행돼요. 삭제는 진짜 지우지 않고 <b>휴지통 폴더</b>로 옮기고(복구 가능), 정리는 <b>기본이 복사</b>(원본 보존)예요.</div>
+    </div>
+  </section>
+
+  <!-- 설치 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">1</span><h2>설치하기</h2></div>
+    <p class="sec-sub">순서대로 한 번만 하면 됩니다.</p>
+    <div class="card">
+      <ol class="steps">
+        <li><b>Node.js를 먼저 설치</b>하세요. <span class="muted">설치파일을 실행하고 계속 &gt; 계속으로 끝내면 돼요.</span></li>
+        <li>받은 압축파일(<code>Neulbeot-Teacher-Package.zip</code>)을 <b>압축 풀기</b>. <span class="muted">되도록 <b>한글이 없는 경로</b>(예: 바탕화면)에 두면 더 안전해요.</span></li>
+        <li><b>업무 폴더를 미리 백업</b>(복사본 하나 만들기)하세요. <span class="muted">늘벗이가 파일을 정리·복사할 수 있으니 혹시 모를 대비예요.</span></li>
+        <li>풀린 폴더의 <b><code>start-server.bat</code></b>을 더블클릭. <span class="muted">검은 창이 뜨고 3초 뒤 브라우저가 열려요. 안 열리면 주소창에 <code>localhost:4000</code>.</span></li>
+      </ol>
+    </div>
+    <div class="callout warn">
+      <span class="ic">🖥️</span>
+      <div class="bd"><b>검은 창은 켜둔 채로</b> 두세요. 그 창을 닫으면 늘벗이가 꺼져요. 처음 실행 때 Node.js 안내가 뜨면 설치 후 다시 실행하면 됩니다.</div>
+    </div>
+  </section>
+
+  <!-- 첫 실행 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">2</span><h2>첫 실행 — 설정 마법사</h2></div>
+    <p class="sec-sub">처음 켜면 4단계가 순서대로 떠요. 그대로 따라가면 됩니다.</p>
+    <div class="card">
+      <ol class="steps">
+        <li><b>이름</b> 입력 — 늘벗이가 이 이름으로 기억하고 설정을 저장해요.</li>
+        <li><b>학사일정 올리기</b> — 준비한 <b>업무계획 PDF</b>를 올리거나 내용을 붙여넣으면, 날짜·행사로 정리해 그 일정을 따라요.</li>
+        <li><b>업무 폴더 선택</b> — <b>윈도우 탐색기 창</b>에서 내 업무 폴더를 고르면 돼요.</li>
+        <li><b>업무 확인</b> — 늘벗이가 폴더·일정을 보고 “선생님 업무가 이런 것 같아요”라고 정리해줘요. <b>맞는지 확인하고 고친 뒤</b> 시작!</li>
+      </ol>
+    </div>
+    <div class="callout tip">
+      <span class="ic">🔑</span>
+      <div class="bd"><b>API 키 넣기</b> — 오른쪽 위 <b>🔑</b>를 눌러 <b>메인 AI(Claude / Gemini / GPT / OpenRouter)를 고르고 키를 입력</b>하세요. 원하면 <b>어시스턴트(보조 AI)</b>도 따로 지정할 수 있어요. 저장하면 그 AI로 바로 작동합니다.</div>
+    </div>
+  </section>
+
+  <!-- 써보기 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">3</span><h2>이렇게 써보세요</h2></div>
+    <p class="sec-sub">아래처럼 자연스럽게 말하듯 시켜 보세요.</p>
+    <div class="prompt"><span class="q">“오늘 날짜 기준으로, 업무 폴더 자료를 참고해서 지금 미리 준비해야 할 업무가 있는지 파악하고, 관련 파일을 한 폴더에 복사해서 정리해줘.”</span></div>
+    <div class="prompt tight"><span class="q">“다음 주 입교식 안내문 초안을 우리 학교 형식으로 써줘.”</span> → 완성되면 <b>📝 한글(.docx)</b>로 저장</div>
+    <div class="prompt tight"><span class="q">“이 수행평가 손글씨 사진들을 텍스트로 옮겨줘.”</span> → <b>✍️ 손글씨 변환</b> 버튼</div>
+    <div class="callout tip">
+      <span class="ic">💡</span>
+      <div class="bd">팀장이 <b>대화를 기억하며 이어서</b> 일해요. 초안이 나온 뒤 “더 정중하게”, “분량 줄여줘”라고 하면 그대로 고쳐줍니다. 파일을 옮기거나 정리할 땐 <b>승인창(✅승인 / ✖거부)</b>이 떠요.</div>
+    </div>
+  </section>
+
+  <!-- 기능 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">＋</span><h2>이런 것도 해요</h2></div>
+    <div class="features">
+      <div class="feat"><div class="fi">📄</div><h3>문서 초안</h3><p>공문·안내문·계획안·발표자료(PPT). 한글(.docx)로 저장.</p></div>
+      <div class="feat"><div class="fi">✍️</div><h3>손글씨 변환</h3><p>수행평가 사진을 텍스트로. 학생 이름은 자동 OO.</p></div>
+      <div class="feat"><div class="fi">🗂️</div><h3>파일 정리</h3><p>승인 후 복사·이동·정리. 삭제는 휴지통으로.</p></div>
+      <div class="feat"><div class="fi">📅</div><h3>일정·마감</h3><p>오늘·이번주·다가오는 마감 알림, 행사 준비 체크리스트.</p></div>
+    </div>
+  </section>
+
+  <!-- 업데이트/문의 -->
+  <section>
+    <div class="sec-head"><span class="sec-num">↻</span><h2>업데이트 · 문의</h2></div>
+    <div class="card">
+      <ol class="steps">
+        <li><b>업데이트</b> — 화면의 <b>🔃 업데이트</b> 버튼을 누르면 최신 버전으로 바뀌어요. <span class="muted">내 키·폴더·일정 설정은 그대로 유지됩니다.</span></li>
+        <li><b>문의 · 공지</b> — 하단 <b>💬 문의·공지</b> 버튼에서 1:1 문의하거나 공지방에 들어갈 수 있어요.</li>
+      </ol>
+    </div>
+  </section>
+
+  <hr class="divider">
+  <footer>
+    문제가 있으면 앱의 <b>💬 문의·공지</b> 또는 담당 선생님에게 알려주세요.<br>
+    🌱 늘벗이가 선생님의 업무를 함께할게요.
+  </footer>
+
+</div>

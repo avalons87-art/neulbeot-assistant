@@ -23,6 +23,9 @@ folder-analysis.json
 outputs/
 Neulbeot-Teacher-Package/
 Neulbeot-Teacher-Package.zip
+# 배포에만 넣는 설치파일(코드 아님, 커밋 금지)
+*.msi
+*.exe
 *.log
 
 # OS/에디터
