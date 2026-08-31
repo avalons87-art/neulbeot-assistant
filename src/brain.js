@@ -6,7 +6,7 @@ const ai = require('./ai');
 const session = require('./session');
 
 const PERSONA = `너는 '늘벗이'라는 이름의 귀여운 픽셀 마스코트이자 AI 팀의 팀장이야.
-세종늘벗학교(대안교육위탁기관)의 신현종 선생님을 돕는 역할이야.
+학교 선생님의 업무를 돕는 역할이야. (특정 학교를 임의로 가정하지 말고, 모르는 학교 정보는 지어내지 마.)
 말투: 다정하고 발랄하게, 짧고 명료하게. 이모지는 가끔 하나 정도만.
 학생 이름은 절대 전체로 말하지 말고 'OO'로 처리해.
 이전 대화 맥락을 이어서 자연스럽게 답해. 앞 내용을 무시하고 처음부터 답하지 마.
@@ -15,6 +15,9 @@ const PERSONA = `너는 '늘벗이'라는 이름의 귀여운 픽셀 마스코�
 
 function ruleReply(msg, todayStr) {
   const t = msg.replace(/\s+/g, '');
+  // 우리 학교 학사일정을 아직 안 불러왔으면 '일정 없음'이 아니라 설정 안내를 한다.
+  if (/(일정|스케줄|할일|마감|언제까지|성적발송|보조자료|성적산출|데드라인|이번주|금주)/.test(t) && schedule.source() !== 'custom')
+    return { reply: '아직 우리 학교 학사일정을 안 넣으셨어요. 아래 "📅 일정 불러오기"에서 학사일정을 붙여넣거나 파일로 올려주시면 그 일정으로 알려드릴게요!', mood: 'idle' };
   if (/^(안녕|하이|hi|hello|반가|좋은아침|굿모닝)/.test(t))
     return { reply: '안녕하세요 선생님! 오늘도 늘벗이 팀이 함께할게요 🌱', mood: 'happy' };
   if (/(오늘).*(일정|뭐|스케줄|할일)|오늘일정/.test(t)) {
@@ -37,9 +40,6 @@ function ruleReply(msg, todayStr) {
     if (dl.length === 0) return { reply: '다가오는 마감은 없어요. 잘 챙기셨네요!', mood: 'happy' };
     return { reply: `마감 일정: ${dl.map((e) => `${e.title}(${e.date.slice(5)}, D-${e.dday})`).join(' / ')}`, mood: 'point' };
   }
-  if (/(전화|번호|연락처)/.test(t)) return { reply: '학교 대표번호는 044-999-1281 이에요.', mood: 'idle' };
-  if (/(주소|위치|어디있)/.test(t)) return { reply: '세종특별자치시 조치원읍 내창천로 52 예요.', mood: 'idle' };
-  if (/보결|보강수당|결보강수당/.test(t)) return { reply: '2026년 수업 결·보강 보결 수당은 15,000원이에요.', mood: 'idle' };
   if (/(힘들|지친|피곤|스트레스|우울)/.test(t))
     return { reply: '선생님 오늘 정말 고생 많으셨어요. 늘벗이가 응원할게요, 조금만 쉬어가요 🌿', mood: 'happy' };
   if (/(고마워|감사|땡큐|thx)/.test(t))

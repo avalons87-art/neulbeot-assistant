@@ -50,7 +50,20 @@ const PROFILES = path.join(__dirname, '..', 'user-profiles.json');
 function loadP() { try { return JSON.parse(fs.readFileSync(PROFILES, 'utf8')); } catch { return {}; } }
 function saveP(o) { try { fs.writeFileSync(PROFILES, JSON.stringify(o, null, 2), 'utf8'); } catch (e) { console.warn('[usercfg] 프로필 저장 실패:', e.message); } }
 function getProfile(uid) { return loadP()[String(uid || '')] || null; }
-function setProfile(uid, work) { const o = loadP(); o[String(uid || '')] = { work: String(work || '').slice(0, 4000), at: Date.now() }; saveP(o); return o[String(uid || '')]; }
+function setProfile(uid, work, school) {
+  const o = loadP();
+  const k = String(uid || ''); const prev = o[k] || {};
+  // school 을 안 보낸 요청이 기존 학교명을 지우지 않게 유지
+  o[k] = { work: String(work || '').slice(0, 4000), school: String(school || prev.school || '').slice(0, 80), at: Date.now() };
+  saveP(o); return o[k];
+}
+// 학교명만 갱신(온보딩 1단계 - 업무 파악 전에 저장). 기존 work 는 보존.
+function setSchool(uid, school) {
+  const o = loadP(); const k = String(uid || '');
+  const cur = o[k] || { work: '', at: Date.now() };
+  cur.school = String(school || '').slice(0, 80); cur.at = Date.now();
+  o[k] = cur; saveP(o); return cur;
+}
 function clearProfile(uid) { const o = loadP(); delete o[String(uid || '')]; saveP(o); }
 
-module.exports = { getFolder, setFolder, sharedRoot: () => SHARED_ROOT, getAnalysis, setAnalysis, getProfile, setProfile, clearProfile };
+module.exports = { getFolder, setFolder, sharedRoot: () => SHARED_ROOT, getAnalysis, setAnalysis, getProfile, setProfile, setSchool, clearProfile };

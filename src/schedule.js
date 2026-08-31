@@ -1,51 +1,13 @@
-// 세종늘벗학교 2026학년도 학사일정 데이터 + 조회 헬퍼
+// 학사일정 조회 헬퍼. 실제 일정은 앱에서 불러온 것(schedule.json)을 쓴다.
+// 아래 EVENTS 는 형식 참고용 예시일 뿐, 자동 기본값으로 쓰이지 않는다.
 // CLAUDE.md의 학사일정을 기계가 읽을 수 있는 형태로 정리한 것.
 // 날짜는 'YYYY-MM-DD' 형식.
 
 const EVENTS = [
-  // ── 1학기 ──
-  { date: '2026-03-09', end: '2026-03-12', title: '1학기 신청기간', tag: '행정' },
-  { date: '2026-03-16', end: '2026-03-19', title: '심층면담', tag: '상담' },
-  { date: '2026-03-23', end: '2026-03-27', title: '학생 맞이 준비', tag: '준비' },
-  { date: '2026-03-30', end: '2026-04-03', title: '마중기간(적응교육)', tag: '행사' },
-  { date: '2026-04-06', title: '입교식', tag: '행사' },
-  { date: '2026-04-09', title: '교육과정설명회·학급간담회', tag: '행사' },
-  { date: '2026-04-10', title: '늘벗지기 선출', tag: '자치' },
-  { date: '2026-04-17', title: '운동회', tag: '행사' },
-  { date: '2026-04-20', end: '2026-04-24', title: '보호자 상담주간', tag: '상담' },
-  { date: '2026-04-24', title: '진로활동', tag: '수업' },
-  { date: '2026-05-01', title: '노동절(재량휴업일)', tag: '휴업' },
-  { date: '2026-05-04', title: '재량휴업일', tag: '휴업' },
-  { date: '2026-05-09', title: '가족캠프(1차)', tag: '행사' },
-  { date: '2026-05-29', title: '진로활동', tag: '수업' },
-  { date: '2026-06-11', title: '보호자연수', tag: '연수' },
-  { date: '2026-06-26', title: '진로활동', tag: '수업' },
-  { date: '2026-07-03', title: '수행평가 성적산출 마감', tag: '마감' },
-  { date: '2026-07-06', title: '재적학교 초청의 날', tag: '행사' },
-  { date: '2026-07-10', title: '학기말 성적 발송', tag: '마감' },
-  { date: '2026-07-15', end: '2026-07-16', title: '배움나눔주간', tag: '행사' },
-  { date: '2026-07-20', end: '2026-07-23', title: '전환기 운영 주간', tag: '준비' },
-  { date: '2026-07-24', title: '방학식 / 학생부 보조자료 발송', tag: '마감' },
-  // ── 2학기 ──
-  { date: '2026-08-18', title: '개학식', tag: '행사' },
-  { date: '2026-08-24', end: '2026-08-28', title: '학생상담주간', tag: '상담' },
-  { date: '2026-08-27', title: '교육과정설명회·학급간담회', tag: '행사' },
-  { date: '2026-09-03', title: '진로활동', tag: '수업' },
-  { date: '2026-09-07', end: '2026-09-11', title: '보호자 상담주간', tag: '상담' },
-  { date: '2026-10-06', end: '2026-10-08', title: '늘벗성장여행', tag: '행사' },
-  { date: '2026-10-15', title: '보호자연수', tag: '연수' },
-  { date: '2026-11-06', title: '수행평가 성적산출 마감(중3·고3)', tag: '마감' },
-  { date: '2026-11-13', title: '학기말 성적 발송(중3·고3)', tag: '마감' },
-  { date: '2026-11-14', title: '가족캠프(2차)', tag: '행사' },
-  { date: '2026-11-20', title: '개교기념일(재량휴업일)', tag: '휴업' },
-  { date: '2026-11-26', title: '학생부 보조자료 발송(중3·고3)', tag: '마감' },
-  { date: '2026-11-27', title: '진로활동', tag: '수업' },
-  { date: '2026-12-04', title: '수행평가 성적산출 마감(전체)', tag: '마감' },
-  { date: '2026-12-11', title: '학기말 성적 발송(전체)', tag: '마감' },
-  { date: '2026-12-17', end: '2026-12-18', title: '배움나눔주간', tag: '행사' },
-  { date: '2026-12-23', title: '음악회(늘벗축제)', tag: '행사' },
-  { date: '2026-12-24', end: '2026-12-30', title: '전환기 운영 주간', tag: '준비' },
-  { date: '2026-12-31', title: '수료식 / 학생부 보조자료 발송', tag: '마감' },
+  // 형식 예시(실제로 쓰이지 않음). 실제 일정은 앱의 '📅 일정 불러오기'로 넣는다.
+  { date: '2026-03-02', title: '개학식', tag: '행사' },
+  { date: '2026-07-20', end: '2026-07-24', title: '기말 정리 주간', tag: '행정' },
+  { date: '2026-12-31', title: '종업식', tag: '행사' },
 ];
 
 function toDate(s) {
@@ -69,8 +31,10 @@ const SCHED_FILE = path.join(__dirname, '..', 'schedule.json');
 let customEvents = [];
 try { const j = JSON.parse(fs.readFileSync(SCHED_FILE, 'utf8')); if (Array.isArray(j.events)) customEvents = j.events; } catch {}
 
-function activeEvents() { return customEvents.length ? customEvents : EVENTS; }
-function source() { return customEvents.length ? 'custom' : 'builtin'; }
+// 불러온 일정이 있으면 그걸, 없으면 비움(학교 중립 — 각 학교 일정을 넣어 쓰도록).
+// (EVENTS 는 세종늘벗학교 예시로 남겨두되 자동 기본값으로는 쓰지 않음)
+function activeEvents() { return customEvents.length ? customEvents : []; }
+function source() { return customEvents.length ? 'custom' : 'none'; }
 
 // 파싱된 일정으로 교체(정규화·정렬). 반환: 개수.
 function setCustom(events) {

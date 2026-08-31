@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>늘벗이 팀 · 세종늘벗학교 AI 비서</title>
+  <title>늘벗이 팀 · 학교 업무 AI 비서</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
@@ -256,8 +256,9 @@
           <!-- ① 이름 -->
           <section class="wpanel" data-s="1">
             <h2>처음 오셨네요! 이름부터 알려주세요 🌱</h2>
-            <p>늘벗이가 이 이름으로 선생님을 기억하고, 설정을 저장해요.</p>
-            <input id="wiz-name" placeholder="예: 신현종" autocomplete="off" />
+            <p>늘벗이가 이 이름으로 선생님을 기억하고, 설정을 저장해요. 학교명을 넣으면 문서에 우리 학교 이름으로 반영돼요.</p>
+            <input id="wiz-name" placeholder="이름 (예: 홍길동)" autocomplete="off" />
+            <input id="wiz-school" placeholder="학교명 (예: OO중학교) — 선택" autocomplete="off" />
             <div class="wiz-msg" id="wiz-name-msg"></div>
             <div class="wiz-nav"><span></span><button class="wnext-primary" id="wiz-name-next">다음 →</button></div>
           </section>
@@ -275,7 +276,7 @@
             <div class="wiz-nav">
               <button class="wback" data-back="1">← 이전</button>
               <div class="wiz-nav-r">
-                <button class="wskip" data-next="3">건너뛰기(기본 일정)</button>
+                <button class="wskip" data-next="3">나중에 넣기</button>
                 <button class="wnext-primary" id="wiz-sched-apply">이 일정으로 설정 →</button>
               </div>
             </div>

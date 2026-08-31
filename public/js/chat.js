@@ -17,8 +17,9 @@
   let lastDeliverable = null;  // {title, body}
 
   // ── 사용자 식별(선생님별 세션 분리) ──
-  function askName() { return (prompt('늘벗이를 사용할 이름을 입력하세요 (예: 신현종)') || '').trim(); }
+  function askName() { return (prompt('늘벗이를 사용할 이름을 입력하세요 (예: 홍길동)') || '').trim(); }
   let UID = localStorage.getItem('nb_name') || '';
+  let SCHOOL = localStorage.getItem('nb_school') || '';  // 학교명(선택) - 문서·프롬프트에 반영
   function showWho() { const w = $('whoami'); if (w) w.textContent = '👤 ' + (UID || '—'); }
   function changeUser() { const n = askName(); if (n) { localStorage.setItem('nb_name', n); location.reload(); } }
 
@@ -200,7 +201,7 @@
   // ── 행사 준비 체크리스트(다가오는 행사 기준) ──
   $('checklistbtn').addEventListener('click', () => {
     if (running) return;
-    input.value = '다가오는 행사와 마감을 확인해서, 가장 가까운 행사의 준비 체크리스트를 만들어줘. 준비물·담당·기한을 표로 정리하고, 세종늘벗학교 상황(대안교육위탁·재적학교 발송 등)에 맞게. 완성하면 산출물로 보여줘.';
+    input.value = '다가오는 행사와 마감을 확인해서, 가장 가까운 행사의 준비 체크리스트를 만들어줘. 준비물·담당·기한을 표로 정리하고, 우리 학교 상황에 맞게. 완성하면 산출물로 보여줘.';
     runAgent('doc');
   });
 
@@ -573,7 +574,7 @@
 
   // ── 학사일정 불러오기 ──
   $('schedbtn').addEventListener('click', () => {
-    const src = window.__schedSource === 'custom' ? `현재: 불러온 일정 사용 중 (${window.__schedTotal || 0}개)` : '현재: 기본(세종늘벗학교 2026) 일정 사용 중';
+    const src = window.__schedSource === 'custom' ? `현재: 불러온 일정 사용 중 (${window.__schedTotal || 0}개)` : '현재: 등록된 학사일정 없음 — 우리 학교 일정을 넣어주세요';
     $('sched-status').textContent = src;
     $('sched-status').className = 'key-status ' + (window.__schedSource === 'custom' ? 'personal' : 'shared');
     $('schedpanel').classList.add('show');
@@ -606,7 +607,7 @@
   });
   $('sched-reset').addEventListener('click', async () => {
     if (!confirm('내장(기본) 일정으로 되돌릴까요? 불러온 일정은 지워져요.')) return;
-    try { await fetch('/api/schedule/reset', { method: 'POST' }); $('schedpanel').classList.remove('show'); addLine('lead', '기본 일정으로 되돌렸어요.'); await loadSchedule(false); } catch { alert('처리 실패'); }
+    try { await fetch('/api/schedule/reset', { method: 'POST' }); $('schedpanel').classList.remove('show'); addLine('lead', '불러온 일정을 지웠어요. 학사일정을 다시 넣어주세요.'); await loadSchedule(false); } catch { alert('처리 실패'); }
   });
 
   // ── 앱 시작(온보딩 이후 또는 재방문) ──
@@ -631,6 +632,7 @@
   function openWizard() {
     WIZ.classList.add('show');
     if (UID) $('wiz-name').value = UID;
+    if (SCHOOL) $('wiz-school').value = SCHOOL;
     wizGo(1);
     setTimeout(() => $('wiz-name').focus(), 120);
   }
@@ -649,10 +651,13 @@
     const msg = $('wiz-name-msg');
     if (!n) { msg.textContent = '이름을 입력해주세요.'; msg.className = 'wiz-msg err'; return; }
     UID = n; localStorage.setItem('nb_name', n); showWho();
+    SCHOOL = $('wiz-school').value.trim(); localStorage.setItem('nb_school', SCHOOL);
+    fetch('/api/school?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, school: SCHOOL }) }).catch(() => {});
     msg.textContent = '';
     wizGo(2);
   });
   $('wiz-name').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('wiz-name-next').click(); });
+  $('wiz-school').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('wiz-name-next').click(); });
 
   // ② 학사일정
   $('wiz-schedfile-btn').addEventListener('click', () => $('wiz-schedfile').click());
@@ -721,7 +726,7 @@
     const work = $('wiz-understand').value.trim();
     const btn = $('wiz-finish'); btn.disabled = true;
     try {
-      if (work) await fetch('/api/onboard/confirm?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, work }) });
+      if (work) await fetch('/api/onboard/confirm?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, work, school: SCHOOL }) });
     } catch {}
     finishWizard();
     setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱\n⚠️ 단, 실제 학생 개인정보(실명·주민번호 등)는 입력하지 말아 주세요(AI로 전송돼요).\n(궁금한 점·오류는 아래 "💬 문의·공지"로 편하게 물어보세요.)`), 400);

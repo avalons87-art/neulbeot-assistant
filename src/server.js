@@ -42,6 +42,15 @@ function folderFor(req) {
 }
 
 // 상태
+// 온보딩에서 확인한 업무 범위·학교를 세션에 실어 팀장이 알고 시작. 반환값은 '이름 · 학교'.
+function whoOf(req, S) {
+  if (!S.workProfile || !S.school) {
+    const p = usercfg.getProfile(uidOf(req));
+    if (p) { if (!S.workProfile) S.workProfile = p.work; if (!S.school) S.school = p.school; }
+  }
+  return [uidOf(req), S.school].filter(Boolean).join(' · ');
+}
+
 app.get('/api/status', (req, res) => {
   const s = ai.status();
   const folder = folderFor(req);
@@ -173,7 +182,7 @@ app.post('/api/analyze-folder', async (req, res) => {
     let overview = null;
     if (ai.status().claude) {
       overview = await ai.callClaude(
-        `너는 세종늘벗학교 담당자의 AI 팀장이다. 업무 폴더의 구조·문서 목록만 보고, 이 폴더가 어떤 자료들로 구성됐는지, 문서 작업 때 참고하기 좋은 자료가 무엇인지 3~5줄로 간결히 정리하라. 담당자가 자주 쓸 자료 위주로.`,
+        `너는 학교 담당 선생님의 AI 팀장이다. 업무 폴더의 구조·문서 목록만 보고, 이 폴더가 어떤 자료들로 구성됐는지, 문서 작업 때 참고하기 좋은 자료가 무엇인지 3~5줄로 간결히 정리하라. 자주 쓸 자료 위주로.`,
         `업무 폴더 구조:\n${struct.text}`,
         { effort: 'low', maxTokens: 450 }
       );
@@ -201,8 +210,9 @@ app.post('/api/onboard/understand', async (req, res) => {
     let understanding = null;
     if (ai.status().claude) {
       understanding = await ai.callClaude(
-        `너는 세종늘벗학교(대안교육위탁기관)의 AI 팀장 '늘벗이'다. 담당 선생님이 처음 설정하는 중이다.
+        `너는 학교 선생님을 돕는 AI 팀장 '늘벗이'다. 담당 선생님이 처음 설정하는 중이다.
 아래 '업무 폴더 구성'과 '학사일정'을 근거로, 이 선생님이 맡은 주요 업무가 무엇일지 추정해 정리하라.
+특정 학교를 임의로 가정하지 말고, 근거 없는 학교 정보는 지어내지 마라.
 - 확정이 아니라 추정임을 전제로, 다정한 존댓말로.
 - 첫 줄에 "제가 살펴본 선생님의 업무는 이런 것 같아요:" 같은 한 줄.
 - 이어서 5~8개 항목을 '- '로 시작하는 불릿(각 한 줄). 폴더/일정에서 근거가 보이는 것 위주.
@@ -218,13 +228,25 @@ app.post('/api/onboard/understand', async (req, res) => {
     res.json({ ok: true, understanding, hasFolder: !!(folder && workfiles.exists(folder)), aiUsed: !!ai.status().claude });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
+// 학교명(온보딩 ① 단계). 프롬프트에 '담당 선생님 · 학교'로만 쓰인다.
+app.get('/api/school', (req, res) => {
+  const p = usercfg.getProfile(uidOf(req));
+  res.json({ ok: true, school: (p && p.school) || '' });
+});
+app.post('/api/school', (req, res) => {
+  const school = (req.body && req.body.school || '').trim();
+  try { usercfg.setSchool(uidOf(req), school); storeFor(req).school = school; res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ ok: false, error: e.message }); }
+});
+
 // 사용자가 확인(수정)한 업무 범위를 저장 → 이후 에이전트가 이 범위를 기억.
 app.post('/api/onboard/confirm', (req, res) => {
   const work = (req.body && req.body.work || '').trim();
+  const school = (req.body && req.body.school || '').trim();
   if (!work) return res.status(400).json({ ok: false, error: '업무 내용이 비었어요.' });
   try {
-    const p = usercfg.setProfile(uidOf(req), work);
-    const S = storeFor(req); S.workProfile = p.work;
+    const p = usercfg.setProfile(uidOf(req), work, school);
+    const S = storeFor(req); S.workProfile = p.work; S.school = p.school;
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ ok: false, error: e.message }); }
 });
@@ -417,8 +439,7 @@ app.get('/api/agent', async (req, res) => {
   const st = ai.status();
   const S = storeFor(req);
   const folder = folderFor(req);
-  // 온보딩에서 확인한 업무 범위를 세션에 실어 팀장이 알고 시작
-  if (!S.workProfile) { const p = usercfg.getProfile(uidOf(req)); if (p) S.workProfile = p.work; }
+  const who = whoOf(req, S);
 
   // 참고 문서: 폴더 파일(?ref=경로) 또는 업로드(세션에 보관됨)
   let refOpts = {};
@@ -437,9 +458,9 @@ app.get('/api/agent', async (req, res) => {
     }
     // 2) Claude 있으면 에이전트 루프, 없으면 기존 팀 회의로 폴백
     if (st.claude) {
-      await agent.run(msg, emit, { ...refOpts, mode: req.query.mode, store: S, folder });
+      await agent.run(msg, emit, { ...refOpts, mode: req.query.mode, store: S, folder, who });
     } else {
-      await team.runMeeting(msg, emit, { ...refOpts, prevDraft: S.draft, onDraft: (d) => { S.setDraft(d); } });
+      await team.runMeeting(msg, emit, { ...refOpts, who, prevDraft: S.draft, onDraft: (d) => { S.setDraft(d); } });
     }
   } catch (e) {
     console.error('[agent] 오류:', e);
@@ -487,6 +508,7 @@ app.get('/api/team', async (req, res) => {
   try {
     await team.runMeeting(task, emit, {
       ...refOpts,
+      who: whoOf(req, S),
       prevDraft: S.draft,
       onDraft: (d) => { S.setDraft(d); },
     });

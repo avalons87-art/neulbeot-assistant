@@ -248,6 +248,7 @@ body {
   font-family: "Galmuri11", "맑은 고딕", sans-serif;
 }
 .wpanel input:focus, .wpanel textarea:focus { border-color: var(--green-lite); }
+#wiz-school { margin-top: 8px; }
 #wiz-schedtext { min-height: 130px; max-height: 32vh; line-height: 1.5; resize: vertical; }
 #wiz-understand { min-height: 200px; max-height: 42vh; line-height: 1.6; resize: vertical; white-space: pre-wrap; }
 .wiz-row { margin-bottom: 10px; }

@@ -4,10 +4,17 @@
 
 const ai = require('./ai');
 
-const CTX = `조직: 세종늘벗학교(세종시 대안교육위탁기관). 담당: 신현종 선생님.
-산출물은 주로 한국 학교 행정 문서다: 공문/내부결재/가정통신문/안내문/계획안/체크리스트/품의서 등.
-규칙: 학생 이름은 반드시 'OO'로 처리. 연도는 '2026학년도' 표기. 실제로 바로 제출 가능하게 구체적으로.
-너희는 4인 팀(팀장·기획·디자인·실무)이다. 각자 앞 사람이 한 작업을 '이어받아' 발전시키며, 앞 내용과 어긋나면 안 된다.`;
+// 회의 공용 컨텍스트. 담당자(이름·학교)는 앱에서 받은 값만 넣고, 없으면 학교를 특정하지 않는다.
+function ctx(who) {
+  const head = who
+    ? '담당: ' + who + '.'
+    : '담당 학교 정보는 없다. 특정 학교를 임의로 가정하거나 지어내지 마라.';
+  return head + '\n' + [
+    '산출물은 주로 한국 학교 행정 문서다: 공문/내부결재/가정통신문/안내문/계획안/체크리스트/품의서 등.',
+    "규칙: 학생 이름은 반드시 'OO'로 처리. 연도는 '○○학년도' 형식으로 표기. 실제로 바로 제출 가능하게 구체적으로.",
+    "너희는 4인 팀(팀장·기획·디자인·실무)이다. 각자 앞 사람이 한 작업을 '이어받아' 발전시키며, 앞 내용과 어긋나면 안 된다.",
+  ].join('\n');
+}
 
 const pick = (a, b) => (a != null ? a : b);
 const ROLE_KO = { lead: '팀장', plan: '기획', design: '디자인', work: '실무' };
@@ -25,6 +32,7 @@ function looksLikeRevision(t) {
 }
 
 async function runMeeting(task, emit, opts = {}) {
+  const CTX = ctx(opts.who);
   const st = ai.status();
   if (!st.claude && !st.gemini) return mockMeeting(task, emit);
 

@@ -129,7 +129,7 @@ function makePath(baseDir, title, ext) {
 
 // 슬라이드 배열 → 실제 파워포인트(.pptx) 저장
 // slides: [{ title, bullets:[...] }] 또는 [{ title, body }]. 첫 슬라이드는 표지로.
-async function savePptx(dir, title, slides) {
+async function savePptx(dir, title, slides, opts = {}) {
   const { file, rel } = makePath(dir, title, 'pptx');
   const PptxGenJS = require('pptxgenjs');
   const p = new PptxGenJS();
@@ -141,7 +141,9 @@ async function savePptx(dir, title, slides) {
   const cover = p.addSlide();
   cover.background = { color: 'F5FBF5' };
   cover.addText(title || '발표자료', { x: 0.7, y: 2.5, w: 12, h: 1.4, fontSize: 40, bold: true, color: '2F5D3A', fontFace: F, align: 'center' });
-  cover.addText('세종늘벗학교', { x: 0.7, y: 4.0, w: 12, h: 0.7, fontSize: 22, color: '5FB56A', fontFace: F, align: 'center' });
+  // 표지 부제 = 앱에 설정된 학교명(없으면 넣지 않는다)
+  const org = String(opts.org || '').trim();
+  if (org) cover.addText(org, { x: 0.7, y: 4.0, w: 12, h: 0.7, fontSize: 22, color: '5FB56A', fontFace: F, align: 'center' });
 
   // 내용 슬라이드
   for (const sl of list) {

@@ -11,7 +11,7 @@ const confirm = require('./confirm');
 
 const MAX_STEPS = 10;
 
-const SYSTEM = `너는 '늘벗이', 세종늘벗학교(대안교육위탁기관) 신현종 선생님의 AI 팀장이야. 기획·디자인·실무 팀원과 함께 일해.
+const SYSTEM = `너는 '늘벗이', 학교 선생님의 업무를 돕는 AI 팀장이야. 기획·디자인·실무 팀원과 함께 일해.
 가장 중요한 원칙은 '연속성'이다: 이 대화에서 앞서 내린 결정·만든 초안을 기억하고 이어서 발전시켜라. 매 요청을 처음부터 새로 시작하지 마라.
 
 너는 상황을 스스로 판단해 아래 도구를 자율적으로 쓴다:
@@ -130,8 +130,8 @@ async function execTool(name, input, emit, store, folder) {
     }
     if (name === 'consult_planners') {
       emit({ type: 'turn', role: 'plan', text: `📋 두 관점으로 상의할게요: ${input.question}` });
-      const sysC = `너는 세종늘벗학교 기획 담당(실용·정확성 관점). 질문에 대해 실무자가 바로 쓸 구체적 방안을 3~5개 불릿으로.`;
-      const sysG = `너는 세종늘벗학교 기획 담당(완성도·톤·독자경험 관점). 받는 사람 입장에서 핵심 메시지·어조 관점의 방안을 3~5개 불릿으로.`;
+      const sysC = `너는 학교 업무 기획 담당(실용·정확성 관점). 질문에 대해 실무자가 바로 쓸 구체적 방안을 3~5개 불릿으로.`;
+      const sysG = `너는 학교 업무 기획 담당(완성도·톤·독자경험 관점). 받는 사람 입장에서 핵심 메시지·어조 관점의 방안을 3~5개 불릿으로.`;
       const [c, g] = await Promise.all([
         ai.askMain(sysC, input.question, { effort: 'medium', maxTokens: 500 }).catch((e) => `(오류: ${e.message})`),
         ai.askAssistant(sysG, input.question, { maxTokens: 700 }).catch((e) => `(오류: ${e.message})`),
@@ -141,6 +141,8 @@ async function execTool(name, input, emit, store, folder) {
       return `[실용 관점]\n${c ?? '(없음)'}\n\n[완성도 관점]\n${g ?? '(어시스턴트 미설정 — 생략)'}`;
     }
     if (name === 'get_schedule') {
+      if (schedule.source() !== 'custom')
+        return '학사일정이 아직 등록되지 않았다(사용자가 우리 학교 일정을 안 넣음). 날짜를 지어내지 말고, 화면 아래 "📅 일정 불러오기"로 학사일정을 넣어달라고 안내하라.';
       const today = schedule.fmt(new Date());
       const s = input.scope;
       if (s === 'today') return JSON.stringify(schedule.eventsOn(today));
@@ -163,7 +165,7 @@ async function execTool(name, input, emit, store, folder) {
     }
     if (name === 'create_pptx') {
       emit({ type: 'turn', role: 'design', text: '🎨 슬라이드로 디자인하는 중…' });
-      const out = await workfiles.savePptx(folder, input.title, input.slides || []);
+      const out = await workfiles.savePptx(folder, input.title, input.slides || [], { org: store.school || '' });
       const preview = workfiles.slidesToText(input.title, input.slides || []);
       store.setDraft({ task: input.title, body: preview });
       emit({ type: 'turn', role: 'work', text: `📊 파워포인트(${out.slideCount + 1}장) 완성!` });
@@ -227,8 +229,9 @@ async function run(userText, emit, opts = {}) {
   if (store._provider && store._provider !== prov) store.agentMessages = [];
   store._provider = prov;
   const tools = folder ? TOOLS : TOOLS.filter((t) => !FILE_TOOLS.includes(t.name));
-  // 온보딩에서 확인한 '내 업무 범위' + 폴더 개요를 시스템에 심어 팀장이 알고 시작
+  // 담당 선생님(이름·학교) + 온보딩에서 확인한 '내 업무 범위' + 폴더 개요를 시스템에 심어 팀장이 알고 시작
   let system = SYSTEM;
+  if (opts.who) system += `\n\n[담당 선생님: ${opts.who}] — 이 선생님과 학교 상황에 맞춰 도와라. 특정 학교(예: 세종늘벗학교)를 임의로 가정하지 말고, 모르는 학교 정보는 지어내지 마라.`;
   if (store.workProfile) system += `\n\n[담당 선생님이 확인한 업무 범위 — 이 사람의 실제 업무다]\n${store.workProfile}\n(이 범위를 기억하고, 관련해 먼저 도와드려라.)`;
   if (store.folderOverview) system += `\n\n[현재 업무 폴더 개요 — 이미 파악한 내용]\n${store.folderOverview}\n(구체적 문서가 필요하면 search_files/read_document 로 찾아 읽어라.)`;
   const messages = store.agentMessages; // 참조(누적 = 연속성)
