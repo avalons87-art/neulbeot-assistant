@@ -104,8 +104,8 @@ app.post('/api/folder', (req, res) => {
 app.get('/api/pick-folder', (req, res) => {
   if (!isOwner(req)) return res.status(403).json({ ok: false, error: '이 기능은 본인 PC(소유자)에서만 돼요.' });
   if (process.platform !== 'win32') return res.json({ ok: false, unsupported: true, error: 'Windows에서만 폴더 선택창을 띄울 수 있어요.' });
-  const ps = "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Neulbeot - select work folder'; $d.ShowNewFolderButton=$true; $t=New-Object System.Windows.Forms.Form; $t.TopMost=$true; $t.ShowInTaskbar=$false; $t.Opacity=0; $t.Show(); $t.Activate(); $r=$d.ShowDialog($t); $t.Dispose(); if($r -eq [System.Windows.Forms.DialogResult]::OK){[Console]::Out.Write($d.SelectedPath)}";
-  execFile('powershell.exe', ['-STA', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { timeout: 180000, windowsHide: true }, (err, stdout) => {
+  const psFile = path.join(__dirname, 'pick-folder.ps1');
+  execFile('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], { timeout: 180000, windowsHide: true }, (err, stdout) => {
     if (err && err.killed) return res.json({ ok: false, error: '시간이 초과됐어요(선택창을 못 찾았을 수 있어요).' });
     const p = String(stdout || '').trim();
     if (!p) return res.json({ ok: true, cancelled: true }); // 사용자가 취소
