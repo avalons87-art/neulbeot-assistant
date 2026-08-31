@@ -107,9 +107,10 @@ app.get('/api/pick-folder', (req, res) => {
   const psFile = path.join(__dirname, 'pick-folder.ps1');
   execFile('powershell.exe', ['-STA', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psFile], { timeout: 180000, windowsHide: true }, (err, stdout) => {
     if (err && err.killed) return res.json({ ok: false, error: '시간이 초과됐어요(선택창을 못 찾았을 수 있어요).' });
-    const p = String(stdout || '').trim();
-    if (!p) return res.json({ ok: true, cancelled: true }); // 사용자가 취소
-    res.json({ ok: true, path: p.replace(/\\/g, '/') });
+    const b64 = String(stdout || '').trim();
+    if (!b64) return res.json({ ok: true, cancelled: true }); // 사용자가 취소
+    const p = Buffer.from(b64, 'base64').toString('utf8').replace(/\\/g, '/'); // 한글 안전
+    res.json({ ok: true, path: p });
   });
 });
 

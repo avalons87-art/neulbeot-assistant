@@ -1,4 +1,6 @@
-param([switch]$Test)
+﻿param([switch]$Test)
+# 경로는 UTF-8 바이트를 base64로 출력(순수 ASCII라 콘솔 인코딩에 안 깨짐). Node에서 디코드.
+function Emit($s) { [Console]::Out.Write([Convert]::ToBase64String([System.Text.Encoding]::UTF8.GetBytes([string]$s))) }
 # 모던 윈도우 폴더 선택창(탐색기 스타일) — IFileOpenDialog + FOS_PICKFOLDERS
 Add-Type -Language CSharp @"
 using System;
@@ -64,6 +66,6 @@ namespace NBFolder {
   }
 }
 "@
-if ($Test) { [Console]::Out.Write('OK'); return }
+if ($Test) { Emit('G:/google/학교 업무/2026 학교 업무'); return }
 $p = [NBFolder.Picker]::Pick()
-if ($p) { [Console]::Out.Write($p) }
+if ($p) { Emit($p) }
