@@ -278,3 +278,5 @@ body {
 .kakao-btn.ask { background: #FEE500; color: #3C1E1E; }
 .kakao-btn.notice { background: #eef3ef; color: #2f5d3a; border: 1px solid #d5e5d8; }
 .help-note { font-size: 12px; color: #7a8a7a; margin: 6px 2px 0; line-height: 1.5; }
+
+#key-or-off { background: #dbe8f5; color: #2a4a6a; }

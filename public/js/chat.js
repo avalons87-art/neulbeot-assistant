@@ -368,7 +368,15 @@
       else if (s.usingPersonal) { txt = '현재: 내 개인 Claude 키 사용 중 (공유 한도와 무관)'; cls = 'personal'; }
       else if (s.sharedAvailable) { txt = '현재: 공유(한도) 키 사용 중'; cls = 'shared'; }
       else { txt = '현재: 키 없음 (데모 모드)'; cls = 'none'; }
+      // 저장돼 있는 개인키 표시(빈 칸으로 저장해도 안 지워짐을 알림)
+      const saved = [];
+      if (s.usingPersonal) saved.push('Claude');
+      if (s.usingPersonalGemini) saved.push('Gemini');
+      if (s.usingOpenRouter) saved.push('OpenRouter');
+      if (saved.length) txt += `\n저장된 개인키: ${saved.join(', ')} · 빈 칸으로 저장해도 안 지워져요`;
       $('key-status').textContent = txt; $('key-status').className = 'key-status ' + cls;
+      // OpenRouter 사용 중이면 '끄고 되돌리기' 버튼 노출
+      $('key-or-off').hidden = !s.usingOpenRouter;
     } catch { $('key-status').textContent = '상태를 못 불러왔어요.'; }
   }
   $('keybadge').addEventListener('click', openKeys);
@@ -377,13 +385,28 @@
     const anthropic = $('key-anthropic').value.trim(), gemini = $('key-gemini').value.trim();
     const openrouter = $('key-openrouter').value.trim(), openrouterModel = $('key-ormodel').value.trim();
     if (!anthropic && !gemini && !openrouter) return alert('키를 입력하세요.');
+    // 입력한 것만 보냄 → 빈 칸은 기존 저장 키를 건드리지 않음
+    const patch = {};
+    if (anthropic) patch.anthropic = anthropic;
+    if (gemini) patch.gemini = gemini;
+    if (openrouter) { patch.openrouter = openrouter; patch.openrouterModel = openrouterModel; }
     const btn = $('key-save'); btn.disabled = true; btn.textContent = '확인 중…';
     try {
-      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ anthropic, gemini, openrouter, openrouterModel }) })).json();
+      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })).json();
       if (d.ok) { renderKeyBadge(d); $('keypanel').classList.remove('show'); addLine('lead', d.usingOpenRouter ? `OpenRouter로 바꿨어요 (${d.openrouterModel}). 🔑` : '내 개인 키로 바꿨어요. 이제 공유 한도와 무관하게 쓸 수 있어요 🔑'); }
       else alert(d.error || '저장 실패');
     } catch { alert('저장 중 문제가 생겼어요.'); }
     finally { btn.disabled = false; btn.textContent = '저장하고 내 키 쓰기'; }
+  });
+  // OpenRouter만 끄고, 저장된 Claude/Gemini 개인키(없으면 공유키)로 되돌리기
+  $('key-or-off').addEventListener('click', async () => {
+    try {
+      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openrouter: '', openrouterModel: '' }) })).json();
+      if (d.ok) {
+        renderKeyBadge(d); $('keypanel').classList.remove('show');
+        addLine('lead', d.usingPersonal ? '내 개인 Claude 키로 돌아왔어요 🔑' : (d.sharedAvailable ? '공유 키로 돌아왔어요 🔑' : 'OpenRouter를 껐어요.'));
+      } else alert(d.error || '처리 실패');
+    } catch { alert('처리 중 문제가 생겼어요.'); }
   });
   $('key-reset').addEventListener('click', async () => {
     if (!confirm('공유(한도) 키로 되돌릴까요? 저장된 개인 키가 지워져요.')) return;

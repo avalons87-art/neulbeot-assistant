@@ -5,6 +5,10 @@ node_modules/
 my-keys.bat
 teacher-keys.bat
 keys.json
+# 키를 적어둔 메모 파일(있으면) — 커밋 금지
+오픈라우터.txt
+*키*.txt
+*key*.txt
 
 # 사용자·설치별 설정 (git pull 시 보존)
 owner.txt
