@@ -1,6 +1,6 @@
 {
   "name": "neulbeot-assistant",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "학교 업무 AI 비서 - 픽셀 캐릭터 팀 (늘벗이 팀)",
   "main": "src/server.js",
   "scripts": {
