@@ -133,12 +133,12 @@ async function execTool(name, input, emit, store, folder) {
       const sysC = `너는 세종늘벗학교 기획 담당(실용·정확성 관점). 질문에 대해 실무자가 바로 쓸 구체적 방안을 3~5개 불릿으로.`;
       const sysG = `너는 세종늘벗학교 기획 담당(완성도·톤·독자경험 관점). 받는 사람 입장에서 핵심 메시지·어조 관점의 방안을 3~5개 불릿으로.`;
       const [c, g] = await Promise.all([
-        ai.callClaude(sysC, input.question, { effort: 'medium', maxTokens: 500 }).catch((e) => `(오류: ${e.message})`),
-        ai.callGemini(sysG, input.question, { maxTokens: 700 }).catch((e) => `(오류: ${e.message})`),
+        ai.askMain(sysC, input.question, { effort: 'medium', maxTokens: 500 }).catch((e) => `(오류: ${e.message})`),
+        ai.askAssistant(sysG, input.question, { maxTokens: 700 }).catch((e) => `(오류: ${e.message})`),
       ]);
       if (c != null) emit({ type: 'turn', role: 'plan', text: `🔵 실용 관점\n${c}` });
       if (g != null) emit({ type: 'turn', role: 'design', text: `🟢 완성도 관점\n${g}` });
-      return `[실용 관점]\n${c ?? '(없음)'}\n\n[완성도 관점]\n${g ?? '(없음)'}`;
+      return `[실용 관점]\n${c ?? '(없음)'}\n\n[완성도 관점]\n${g ?? '(어시스턴트 미설정 — 생략)'}`;
     }
     if (name === 'get_schedule') {
       const today = schedule.fmt(new Date());
@@ -234,9 +234,14 @@ async function run(userText, emit, opts = {}) {
   const messages = store.agentMessages; // 참조(누적 = 연속성)
   const refBlock = opts.refText ? `\n\n[선생님이 첨부한 참고 문서: ${opts.refName}]\n${String(opts.refText).slice(0, 6000)}` : '';
   const nudge = opts.mode === 'doc' ? '\n(이건 문서 작업 요청이야. 필요하면 자료를 찾아보고, 완성하면 present_deliverable 로 보여줘.)' : '';
-  messages.push({ role: 'user', content: userText + nudge + refBlock });
+  const userContent = userText + nudge + refBlock;
+  const ctx = { store, folder, tools, system };
 
-  if (prov === 'openrouter') { await runOR(emit, { store, folder, tools, system }); store._trim(); return; }
+  // 메인 제공자별 에이전트 루프
+  if (prov === 'gemini') { messages.push({ role: 'user', parts: [{ text: userContent }] }); await runGemini(emit, ctx); store._trim(); return; }
+  messages.push({ role: 'user', content: userContent });
+  if (prov === 'openrouter') { await runOpenAILike(emit, ctx, ai.orChat, 'OpenRouter'); store._trim(); return; }
+  if (prov === 'gpt') { await runOpenAILike(emit, ctx, ai.openaiChat, 'GPT'); store._trim(); return; }
 
   for (let step = 0; step < MAX_STEPS; step++) {
     let res;
@@ -268,20 +273,20 @@ async function run(userText, emit, opts = {}) {
   store._trim();
 }
 
-// OpenRouter(OpenAI 호환) 에이전트 루프 — 도구를 function 형식으로 변환해 사용.
-async function runOR(emit, { store, folder, tools, system }) {
+// OpenAI 호환(OpenRouter/GPT) 에이전트 루프 — chatFn(orChat 또는 openaiChat)으로 호출. 도구=function 형식.
+async function runOpenAILike(emit, { store, folder, tools, system }, chatFn, label) {
   const messages = store.agentMessages; // OpenAI 형식(role/content, tool_calls, tool)
-  const orTools = tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
+  const oaTools = tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.input_schema } }));
   for (let step = 0; step < MAX_STEPS; step++) {
     let j;
     try {
-      j = await ai.orChat([{ role: 'system', content: system }, ...messages], { maxTokens: 4096, tools: orTools });
+      j = await chatFn([{ role: 'system', content: system }, ...messages], { maxTokens: 4096, tools: oaTools });
     } catch (e) {
-      emit({ type: 'turn', role: 'lead', text: '앗, 처리 중 문제가 생겼어요(OpenRouter): ' + e.message });
+      emit({ type: 'turn', role: 'lead', text: `앗, 처리 중 문제가 생겼어요(${label}): ` + e.message });
       return;
     }
     const msg = j.choices?.[0]?.message;
-    if (!msg) { emit({ type: 'turn', role: 'lead', text: 'OpenRouter 응답이 비었어요.' }); return; }
+    if (!msg) { emit({ type: 'turn', role: 'lead', text: `${label} 응답이 비었어요.` }); return; }
     if (msg.content && String(msg.content).trim()) emit({ type: 'turn', role: 'lead', text: String(msg.content).trim() });
     const calls = msg.tool_calls || [];
     messages.push(calls.length ? { role: 'assistant', content: msg.content ?? null, tool_calls: calls } : { role: 'assistant', content: msg.content || '' });
@@ -292,6 +297,35 @@ async function runOR(emit, { store, folder, tools, system }) {
       const result = await execTool(call.function?.name, input, emit, store, folder);
       messages.push({ role: 'tool', tool_call_id: call.id, content: String(result) });
     }
+    if (step === MAX_STEPS - 1) emit({ type: 'turn', role: 'lead', text: '(작업이 길어져 여기서 멈출게요. 이어서 말씀해주세요!)' });
+  }
+}
+
+// Gemini 에이전트 루프 — functionCall/functionResponse 형식. contents=[{role, parts}].
+async function runGemini(emit, { store, folder, tools, system }) {
+  const contents = store.agentMessages; // Gemini 형식
+  const gTools = tools.map((t) => ({ name: t.name, description: t.description, parameters: t.input_schema }));
+  for (let step = 0; step < MAX_STEPS; step++) {
+    let j;
+    try {
+      j = await ai.geminiAgent({ system, contents, tools: gTools, maxTokens: 4096 });
+    } catch (e) {
+      emit({ type: 'turn', role: 'lead', text: '앗, 처리 중 문제가 생겼어요(Gemini): ' + e.message });
+      return;
+    }
+    const parts = j.candidates?.[0]?.content?.parts || [];
+    if (!parts.length) { emit({ type: 'turn', role: 'lead', text: 'Gemini 응답이 비었어요.' }); return; }
+    const textOut = parts.filter((p) => p.text).map((p) => p.text).join('').trim();
+    if (textOut) emit({ type: 'turn', role: 'lead', text: textOut });
+    contents.push({ role: 'model', parts });
+    const calls = parts.filter((p) => p.functionCall).map((p) => p.functionCall);
+    if (!calls.length) break;
+    const responseParts = [];
+    for (const call of calls) {
+      const result = await execTool(call.name, call.args || {}, emit, store, folder);
+      responseParts.push({ functionResponse: { name: call.name, response: { result: String(result) } } });
+    }
+    contents.push({ role: 'user', parts: responseParts });
     if (step === MAX_STEPS - 1) emit({ type: 'turn', role: 'lead', text: '(작업이 길어져 여기서 멈출게요. 이어서 말씀해주세요!)' });
   }
 }

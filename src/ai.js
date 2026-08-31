@@ -38,12 +38,45 @@ function anthropicKey() { return cleanKey(personal.anthropic || process.env.ANTH
 function geminiKey() { return cleanKey(personal.gemini || process.env.GEMINI_API_KEY); }
 function openrouterKey() { return cleanKey(personal.openrouter || process.env.OPENROUTER_API_KEY); }
 function openrouterModel() { return cleanKey(personal.openrouterModel || process.env.OPENROUTER_MODEL); }
+function openaiKey() { return cleanKey(personal.openai || process.env.OPENAI_API_KEY); }
+function openaiModel() { return cleanKey(personal.openaiModel || process.env.OPENAI_MODEL) || 'gpt-4o'; }
 
 // 어느 제공자로 Claude 역할(팀장/에이전트/파싱)을 처리할지: OpenRouter 키가 있으면 그걸 우선.
-function provider() {
-  if (openrouterKey() && openrouterModel() && !personal.openrouterOff) return 'openrouter';
-  if (anthropicKey() && Anthropic) return 'anthropic';
+// 각 제공자 사용 가능 여부 (claude/gemini/gpt/openrouter)
+function avail() {
+  return {
+    claude: !!(anthropicKey() && Anthropic),
+    gemini: !!geminiKey(),
+    gpt: !!openaiKey(),
+    openrouter: !!(openrouterKey() && openrouterModel() && !personal.openrouterOff),
+  };
+}
+// 메인 제공자(팀장/문서작업). personal.main 이 있고 키가 있으면 그것, 없으면 자동.
+function mainProvider() {
+  const a = avail(); const m = personal.main;
+  if (m && a[m]) return m;
+  if (a.openrouter) return 'openrouter';
+  if (a.claude) return 'claude';
+  if (a.gpt) return 'gpt';
+  if (a.gemini) return 'gemini';
   return 'none';
+}
+// 어시스턴트 제공자(기획 '완성도 관점' 등 보조). 'none'이면 안 씀.
+function assistantProvider() {
+  const a = avail(); const s = personal.assistant;
+  if (s === 'none') return 'none';
+  if (s && a[s]) return s;
+  const main = mainProvider();
+  for (const c of ['gemini', 'claude', 'gpt']) if (c !== main && a[c]) return c; // 메인과 다른 것 하나(자동)
+  return 'none';
+}
+// 하위호환: 기존 코드가 부르는 provider()는 메인 제공자
+function provider() { return mainProvider(); }
+// 메인/어시스턴트 역할 설정. main:'auto'|claude|gemini|gpt|openrouter, assistant:'auto'|'none'|claude|gemini|gpt
+function setRoles({ main, assistant } = {}) {
+  if (main !== undefined) { if (!main || main === 'auto') delete personal.main; else personal.main = main; }
+  if (assistant !== undefined) { if (!assistant || assistant === 'auto') delete personal.assistant; else personal.assistant = assistant; }
+  savePersonal(personal); client = null; clientKey = null;
 }
 // OpenRouter를 켜기/끄기(키는 지우지 않고 보존 — 껐다 켰다 전환)
 function setOpenRouterEnabled(on) {
@@ -74,6 +107,41 @@ async function orText(system, user, opts = {}) {
   return (j.choices?.[0]?.message?.content || '').trim();
 }
 
+// OpenAI(GPT) 직접 호출 (chat completions). messages=OpenAI 형식.
+async function openaiChat(messages, opts = {}) {
+  const key = openaiKey(); const model = opts.model || openaiModel();
+  if (!key) throw new Error('OpenAI(GPT) 키 없음');
+  const body = { model, messages, max_tokens: opts.maxTokens || 1000 };
+  if (opts.tools) { body.tools = opts.tools; body.tool_choice = 'auto'; }
+  if (opts.jsonMode) body.response_format = { type: 'json_object' };
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + key, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`OpenAI ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
+}
+async function openaiText(system, user, opts = {}) {
+  const msgs = [{ role: 'system', content: system }, ...(opts.history || []), { role: 'user', content: user }];
+  const j = await openaiChat(msgs, { maxTokens: opts.maxTokens || 800, jsonMode: opts.jsonMode });
+  return (j.choices?.[0]?.message?.content || '').trim();
+}
+
+// 지정 제공자로 텍스트 답변 (프롬프트 라우팅). prov: claude|gemini|gpt|openrouter
+async function askText(prov, system, user, opts = {}) {
+  if (prov === 'claude') {
+    const c = getClient(); if (!c) return null;
+    const model = activeModel();
+    const res = await c.messages.create({ model, max_tokens: opts.maxTokens || 600, ...effortCfg(model, opts.effort), system, messages: [...(opts.history || []), { role: 'user', content: user }] });
+    return (res.content.find((b) => b.type === 'text')?.text || '').trim();
+  }
+  if (prov === 'gemini') return geminiText(system, user, opts);
+  if (prov === 'gpt') return openaiText(system, user, opts);
+  if (prov === 'openrouter') return orText(system, user, opts);
+  return null;
+}
+async function askMain(system, user, opts = {}) { return askText(mainProvider(), system, user, opts); }
+async function askAssistant(system, user, opts = {}) { const p = assistantProvider(); return p === 'none' ? null : askText(p, system, user, opts); }
+
 // Anthropic 클라이언트를 현재 키로 (키 바뀌면 재생성)
 let client = null, clientKey = null;
 function getClient() {
@@ -84,19 +152,9 @@ function getClient() {
   return client;
 }
 
+// 메인 제공자로 텍스트 답변(브레인/폴더개요/일정파싱 등이 사용)
 async function callClaude(system, user, opts = {}) {
-  if (provider() === 'openrouter') { try { return await orText(system, user, opts); } catch (e) { console.warn('[ai] OpenRouter 실패:', e.message); throw e; } }
-  const c = getClient(); if (!c) return null;
-  const history = Array.isArray(opts.history) ? opts.history : [];
-  const model = activeModel();
-  const res = await c.messages.create({
-    model,
-    max_tokens: opts.maxTokens || 600,
-    ...effortCfg(model, opts.effort),
-    system,
-    messages: [...history, { role: 'user', content: user }],
-  });
-  return (res.content.find((b) => b.type === 'text')?.text || '').trim();
+  return askMain(system, user, opts);
 }
 
 // 학사일정 텍스트 → 구조화된 일정 배열([{date,end?,title,tag}]). 구조화 출력으로 안정적 파싱.
@@ -129,32 +187,27 @@ async function extractSchedule(text, opts = {}) {
 - tag 는 행사/마감/휴업/상담/수업/연수/준비/자치/행정/일정 중 가장 맞는 것.
 - 표·목록 형태여도 최대한 다 뽑되, 날짜가 불명확한 건 버린다.`;
   const user = '학사일정 텍스트:\n' + String(text).slice(0, 14000);
-  // OpenRouter: JSON 모드로 파싱
-  if (provider() === 'openrouter') {
-    const t = await orText(sys + '\n반드시 {"events":[{"date","end","title","tag"}, ...]} JSON만 출력.', user, { maxTokens: 8000, jsonMode: true });
-    const m = t.match(/\{[\s\S]*\}/); if (!m) return [];
-    try { return (JSON.parse(m[0]).events) || []; } catch { return []; }
+  const main = mainProvider();
+  // Claude: 구조화 출력(권장)
+  if (main === 'claude') {
+    const c = getClient(); if (!c) return null;
+    try {
+      const res = await c.messages.create({
+        model: CLAUDE_MODEL, max_tokens: 8000,
+        output_config: { format: { type: 'json_schema', schema: SCHED_SCHEMA } },
+        system: sys, messages: [{ role: 'user', content: user }],
+      });
+      const t = res.content.find((b) => b.type === 'text')?.text || '{}';
+      const ev = (JSON.parse(t).events) || [];
+      if (ev.length) return ev;
+    } catch (e) { console.warn('[ai] 구조화 일정파싱 실패, 폴백:', e.message); }
   }
-  const c = getClient(); if (!c) return null;
-  // 1) 구조화 출력(권장)
-  try {
-    const res = await c.messages.create({
-      model: CLAUDE_MODEL, max_tokens: 8000,
-      output_config: { format: { type: 'json_schema', schema: SCHED_SCHEMA } },
-      system: sys, messages: [{ role: 'user', content: user }],
-    });
-    const t = res.content.find((b) => b.type === 'text')?.text || '{}';
-    const ev = (JSON.parse(t).events) || [];
-    if (ev.length) return ev;
-  } catch (e) { console.warn('[ai] 구조화 일정파싱 실패, 폴백:', e.message); }
-  // 2) 폴백: 일반 호출 + JSON 추출
-  const res2 = await c.messages.create({
-    model: CLAUDE_MODEL, max_tokens: 8000,
-    system: sys + '\n반드시 {"events":[{"date","end","title","tag"}, ...]} 형태의 JSON만 출력하라. 다른 말 금지.',
-    messages: [{ role: 'user', content: user }],
-  });
-  const t2 = res2.content.find((b) => b.type === 'text')?.text || '';
-  const m = t2.match(/\{[\s\S]*\}/);
+  // 그 외(Gemini/GPT/OpenRouter) 또는 Claude 폴백: JSON만 출력 요청 후 파싱
+  const t2 = await askText(main === 'none' ? 'claude' : main,
+    sys + '\n반드시 {"events":[{"date","end","title","tag"}, ...]} 형태의 JSON만 출력하라. 다른 말·코드블록 금지.',
+    user, { maxTokens: 8000, jsonMode: true });
+  if (t2 == null) return null;
+  const m = String(t2).match(/\{[\s\S]*\}/);
   if (!m) return [];
   try { return (JSON.parse(m[0]).events) || []; } catch { return []; }
 }
@@ -185,9 +238,8 @@ async function claudeAgent({ system, messages, tools, maxTokens = 4096, effort =
   return res;
 }
 
-async function callGemini(system, user, opts = {}) {
-  // OpenRouter를 쓰는 설치에선 '완성도 관점'도 OpenRouter 모델로 처리
-  if (provider() === 'openrouter') { try { return await orText(system, user, opts); } catch (e) { console.warn('[ai] OpenRouter(gemini역할) 실패:', e.message); return null; } }
+// Gemini 원본 텍스트 호출
+async function geminiText(system, user, opts = {}) {
   const key = geminiKey(); if (!key) return null;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
   const base = {
@@ -213,6 +265,22 @@ async function callGemini(system, user, opts = {}) {
     if (r.status !== 400) break;
   }
   throw new Error(`Gemini ${lastErr}`);
+}
+const callGemini = geminiText; // 하위호환 별칭
+
+// Gemini 에이전트(function calling) 원본 호출. contents=Gemini 형식, tools=functionDeclarations. 반환: 응답 JSON.
+async function geminiAgent({ system, contents, tools, maxTokens = 4096 }) {
+  const key = geminiKey(); if (!key) return null;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+  const body = {
+    systemInstruction: { parts: [{ text: system }] },
+    contents,
+    generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7, thinkingConfig: { thinkingBudget: 0 } },
+  };
+  if (tools && tools.length) body.tools = [{ functionDeclarations: tools }];
+  const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`Gemini ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  return r.json();
 }
 
 // 손글씨/이미지 → 텍스트(OCR). 비용상 Gemini 우선(무료등급·한글 손글씨 강함), 없으면 Claude, 그다음 OpenRouter.
@@ -280,37 +348,63 @@ async function testOpenRouterKey(key, model) {
   if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 150)}`);
   return true;
 }
+async function testOpenAIKey(key, model) {
+  const k = assertAsciiKey(cleanKey(key), 'GPT');
+  const m = cleanKey(model) || 'gpt-4o';
+  const r = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + k, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: m, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+  });
+  if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 150)}`);
+  return true;
+}
 
-// 개인 키 설정/해제. patch: {anthropic?, gemini?, openrouter?, openrouterModel?} — ''이면 해제.
+// 개인 키 설정/해제. patch 키: anthropic/gemini/openai/openaiModel/openrouter/openrouterModel — ''이면 해제.
 function setKeys(patch = {}) {
   const next = { ...personal };
-  for (const k of ['anthropic', 'gemini', 'openrouter', 'openrouterModel']) {
+  for (const k of ['anthropic', 'gemini', 'openai', 'openaiModel', 'openrouter', 'openrouterModel']) {
     if (patch[k] !== undefined) { const v = cleanKey(patch[k]); if (v) next[k] = v; else delete next[k]; }
   }
-  // OpenRouter 키를 새로 넣으면 자동으로 켜짐 상태로
-  if (patch.openrouter && cleanKey(patch.openrouter)) delete next.openrouterOff;
+  if (patch.openrouter && cleanKey(patch.openrouter)) delete next.openrouterOff; // OR 키 새로 넣으면 켜짐
   personal = next; savePersonal(personal);
   client = null; clientKey = null;
 }
 
+const PROVIDER_LABEL = { claude: 'Claude', gemini: 'Gemini', gpt: 'GPT', openrouter: 'OpenRouter', none: '없음' };
+function modelOf(prov) {
+  if (prov === 'claude') return activeModel();
+  if (prov === 'gemini') return GEMINI_MODEL;
+  if (prov === 'gpt') return openaiModel();
+  if (prov === 'openrouter') return openrouterModel();
+  return null;
+}
 function status() {
-  const p = provider();
+  const p = mainProvider();
+  const asst = assistantProvider();
+  const a = avail();
   return {
-    claude: p !== 'none',              // Claude 역할(팀장/에이전트)이 가능한가
+    claude: p !== 'none',                    // 메인 AI(팀장/에이전트) 사용 가능한가 (하위호환 필드명)
     gemini: !!geminiKey() || p === 'openrouter',
-    claudeModel: p === 'openrouter' ? openrouterModel() : CLAUDE_MODEL,
-    geminiModel: GEMINI_MODEL,
     provider: p,
+    main: p, mainLabel: PROVIDER_LABEL[p], mainModel: modelOf(p),
+    assistant: asst, assistantLabel: PROVIDER_LABEL[asst], assistantModel: modelOf(asst),
+    mainSetting: personal.main || 'auto',     // 사용자가 고른 값(자동이면 'auto')
+    assistantSetting: personal.assistant || 'auto',
+    avail: a,                                 // {claude,gemini,gpt,openrouter} 키 있는지
+    // 개별 키 저장 여부
+    hasClaude: a.claude, hasGemini: a.gemini, hasGpt: a.gpt,
+    openaiModel: openaiModel(),
     usingPersonal: !!personal.anthropic,
     usingPersonalGemini: !!personal.gemini,
     usingOpenRouter: p === 'openrouter',
     openrouterModel: openrouterModel() || null,
-    openrouterStored: !!(openrouterKey() && openrouterModel()), // 키가 저장돼 있는가(끔 상태 포함)
-    openrouterOff: !!personal.openrouterOff,                     // 저장돼 있지만 꺼둔 상태인가
+    openrouterStored: !!(openrouterKey() && openrouterModel()),
+    openrouterOff: !!personal.openrouterOff,
     sharedAvailable: !!process.env.ANTHROPIC_API_KEY,
-    mode: currentMode(),                     // saver | balanced | quality
-    modeModel: p === 'openrouter' ? openrouterModel() : activeModel(),
+    mode: currentMode(),
+    modeModel: modelOf(p),
   };
 }
 
-module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, setOpenRouterEnabled, setMode, status, CLAUDE_MODEL, GEMINI_MODEL };
+module.exports = { callClaude, callGemini, askMain, askAssistant, mainProvider, assistantProvider, claudeAgent, geminiAgent, extractSchedule, transcribeImage, orChat, openaiChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, testOpenAIKey, setKeys, setOpenRouterEnabled, setRoles, setMode, status, CLAUDE_MODEL, GEMINI_MODEL };

@@ -59,25 +59,39 @@ app.get('/api/keys', (req, res) => {
   res.json({ ok: true, ...pubKeyStatus() });
 });
 app.post('/api/keys', async (req, res) => {
-  const { anthropic, gemini, openrouter, openrouterModel, reset, openrouterEnabled } = req.body || {};
+  const { anthropic, gemini, openai, openaiModel, openrouter, openrouterModel, reset, openrouterEnabled, main, assistant } = req.body || {};
   try {
     // OpenRouter 켜기/끄기 토글 (키는 보존)
     if (openrouterEnabled !== undefined) { ai.setOpenRouterEnabled(!!openrouterEnabled); return res.json({ ok: true, ...pubKeyStatus() }); }
-    if (reset) { ai.setKeys({ anthropic: '', gemini: '', openrouter: '', openrouterModel: '' }); ai.setOpenRouterEnabled(true); return res.json({ ok: true, reset: true, ...pubKeyStatus() }); }
+    // 메인/어시스턴트 역할만 바꾸기
+    if (main !== undefined || assistant !== undefined) { ai.setRoles({ main, assistant }); return res.json({ ok: true, ...pubKeyStatus() }); }
+    if (reset) { ai.setKeys({ anthropic: '', gemini: '', openai: '', openaiModel: '', openrouter: '', openrouterModel: '' }); ai.setOpenRouterEnabled(true); ai.setRoles({ main: 'auto', assistant: 'auto' }); return res.json({ ok: true, reset: true, ...pubKeyStatus() }); }
     // 저장 전 유효성 검사(입력된 것만)
     if (openrouter) {
       if (!openrouterModel) return res.status(400).json({ ok: false, error: 'OpenRouter 모델도 입력하세요 (예: anthropic/claude-sonnet-4.5).' });
       try { await ai.testOpenRouterKey(openrouter, openrouterModel); } catch (e) { return res.status(400).json({ ok: false, error: 'OpenRouter 키/모델 오류: ' + e.message }); }
     }
-    if (anthropic) await ai.testAnthropicKey(anthropic);
+    if (openai) { try { await ai.testOpenAIKey(openai, openaiModel); } catch (e) { return res.status(400).json({ ok: false, error: 'GPT(OpenAI) 키/모델 오류: ' + e.message }); } }
+    if (anthropic) { try { await ai.testAnthropicKey(anthropic); } catch (e) { return res.status(400).json({ ok: false, error: 'Claude 키 오류: ' + e.message }); } }
     if (gemini) { try { await ai.testGeminiKey(gemini); } catch (e) { return res.status(400).json({ ok: false, error: 'Gemini 키 오류: ' + e.message }); } }
-    ai.setKeys({ anthropic, gemini, openrouter, openrouterModel });
+    ai.setKeys({ anthropic, gemini, openai, openaiModel, openrouter, openrouterModel });
     res.json({ ok: true, ...pubKeyStatus() });
   } catch (e) {
-    res.status(400).json({ ok: false, error: 'Claude 키가 유효하지 않아요: ' + e.message });
+    res.status(400).json({ ok: false, error: '키 저장 오류: ' + e.message });
   }
 });
-function pubKeyStatus() { const s = ai.status(); return { claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable, openrouterStored: s.openrouterStored, openrouterOff: s.openrouterOff, mode: s.mode, modeModel: s.modeModel }; }
+function pubKeyStatus() {
+  const s = ai.status();
+  return {
+    claude: s.claude, gemini: s.gemini, sharedAvailable: s.sharedAvailable,
+    main: s.main, mainLabel: s.mainLabel, mainModel: s.mainModel, mainSetting: s.mainSetting,
+    assistant: s.assistant, assistantLabel: s.assistantLabel, assistantSetting: s.assistantSetting,
+    avail: s.avail, hasClaude: s.hasClaude, hasGemini: s.hasGemini, hasGpt: s.hasGpt, openaiModel: s.openaiModel,
+    usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini,
+    usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, openrouterStored: s.openrouterStored, openrouterOff: s.openrouterOff,
+    mode: s.mode, modeModel: s.modeModel,
+  };
+}
 
 // AI 모드(절약/균형/품질) 설정
 app.post('/api/mode', (req, res) => {

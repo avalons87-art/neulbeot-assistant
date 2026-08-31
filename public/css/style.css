@@ -294,3 +294,12 @@ body {
 .mode-btn:hover { background: #eef7ef; }
 .mode-btn.active { background: var(--green); color: #fff; border-color: var(--green); }
 .mode-hint { font-size: 11.5px; color: #6a7a6a; line-height: 1.5; margin-bottom: 10px; white-space: pre-line; }
+
+/* ── 메인/어시스턴트 역할 선택 ── */
+.role-box { border: 1px solid #d5e5d8; background: #f3faf4; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; }
+.role-title { font-size: 12.5px; font-weight: bold; color: #2f5d3a; margin-bottom: 8px; }
+.role-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 5px 0; }
+.role-row label { font-size: 12.5px; color: #33413a; font-weight: bold; margin: 0; }
+.role-row label .opt { color: #8aa08f; font-weight: normal; font-size: 11.5px; }
+.role-row select { padding: 6px 10px; border: 1px solid #cdddd0; border-radius: 8px; font-size: 12.5px; background: #fbfffb; color: #1a2b20; cursor: pointer; }
+.role-hint { font-size: 11.5px; color: #6a7a6a; margin-top: 6px; line-height: 1.5; white-space: pre-line; }

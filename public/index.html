@@ -107,10 +107,39 @@
               </div>
             </details>
 
-            <label>Claude 키</label>
+            <div class="role-box">
+              <div class="role-title">🧩 누구를 메인/어시스턴트로 쓸지</div>
+              <div class="role-row">
+                <label>🧠 메인 <span class="opt">(문서작업·팀장)</span></label>
+                <select id="role-main">
+                  <option value="auto">자동</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="gpt">GPT</option>
+                  <option value="openrouter">OpenRouter</option>
+                </select>
+              </div>
+              <div class="role-row">
+                <label>🎨 어시스턴트 <span class="opt">(완성도 관점)</span></label>
+                <select id="role-assistant">
+                  <option value="auto">자동</option>
+                  <option value="none">안 씀</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="gpt">GPT</option>
+                </select>
+              </div>
+              <div class="role-hint" id="role-hint"></div>
+            </div>
+
+            <label>Claude 키 <span class="opt">(sk-ant-…)</span></label>
             <input id="key-anthropic" type="password" placeholder="sk-ant-..." autocomplete="off" />
-            <label>Gemini 키 <span class="opt">(선택)</span></label>
+            <label>Gemini 키 <span class="opt">(AIza… · 무료등급)</span></label>
             <input id="key-gemini" type="password" placeholder="AIza..." autocomplete="off" />
+            <label>GPT(OpenAI) 키 <span class="opt">(sk-…)</span></label>
+            <input id="key-openai" type="password" placeholder="sk-..." autocomplete="off" />
+            <label>GPT 모델 <span class="opt">(기본 gpt-4o)</span></label>
+            <input id="key-openaimodel" type="text" placeholder="gpt-4o" autocomplete="off" />
 
             <div class="or-sep">또는 — OpenRouter 키 하나로 (여러 모델 통합)</div>
             <label>OpenRouter 키 <span class="opt">(넣으면 위 두 키 대신 이걸로 전부 처리)</span></label>

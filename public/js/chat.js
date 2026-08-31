@@ -370,10 +370,7 @@
   // ── API 키 설정 (공유 키 ↔ 개인 키 교체) ──
   function renderKeyBadge(s) {
     const b = $('keybadge');
-    if (s.usingOpenRouter) b.textContent = '🔑 OpenRouter';
-    else if (s.usingPersonal) b.textContent = '🔑 내 키';
-    else if (s.sharedAvailable) b.textContent = '🔑 공유 키';
-    else b.textContent = '🔑 키 없음';
+    b.textContent = '🔑 ' + (s.mainLabel && s.main !== 'none' ? s.mainLabel : '키 없음');
   }
   function renderMode(s) {
     const mode = s.mode || 'quality';
@@ -393,23 +390,36 @@
       else alert(d.error || '설정 실패');
     } catch { alert('처리 중 문제가 생겼어요.'); }
   }));
+  function renderRoles(s) {
+    if ($('role-main')) $('role-main').value = s.mainSetting || 'auto';
+    if ($('role-assistant')) $('role-assistant').value = s.assistantSetting || 'auto';
+    const h = $('role-hint');
+    if (h) {
+      const have = [];
+      if (s.hasClaude) have.push('Claude'); if (s.hasGemini) have.push('Gemini'); if (s.hasGpt) have.push('GPT');
+      if (s.openrouterStored && !s.openrouterOff) have.push('OpenRouter');
+      h.textContent = `지금 메인: ${s.mainLabel || '없음'} · 어시스턴트: ${s.assistantLabel || '없음'}` +
+        (have.length ? `\n키 있는 AI: ${have.join(', ')} (없는 걸 고르면 자동으로 있는 걸 써요)` : '\n아직 저장된 개인키가 없어요(공유 키로 동작 중).');
+    }
+  }
   async function openKeys() {
     $('keypanel').classList.add('show');
-    $('key-anthropic').value = ''; $('key-gemini').value = ''; $('key-openrouter').value = ''; $('key-ormodel').value = '';
+    ['key-anthropic', 'key-gemini', 'key-openai', 'key-openaimodel', 'key-openrouter', 'key-ormodel'].forEach((id) => { if ($(id)) $(id).value = ''; });
     try {
       const s = await (await fetch('/api/keys')).json();
-      renderKeyBadge(s); renderMode(s);
-      let txt, cls;
-      if (s.usingOpenRouter) { txt = `현재: OpenRouter 사용 중 (${s.openrouterModel || ''})`; cls = 'personal'; if (s.openrouterModel) $('key-ormodel').value = s.openrouterModel; }
-      else if (s.usingPersonal) { txt = '현재: 내 개인 Claude 키 사용 중 (공유 한도와 무관)'; cls = 'personal'; }
-      else if (s.sharedAvailable) { txt = '현재: 공유(한도) 키 사용 중'; cls = 'shared'; }
-      else { txt = '현재: 키 없음 (데모 모드)'; cls = 'none'; }
+      renderKeyBadge(s); renderMode(s); renderRoles(s);
+      let cls = s.main === 'none' ? 'none' : (s.usingPersonal || s.usingOpenRouter || s.hasGemini || s.hasGpt ? 'personal' : 'shared');
+      let txt = `현재 메인: ${s.mainLabel || '없음'}${s.mainModel ? ' (' + s.mainModel + ')' : ''} · 어시스턴트: ${s.assistantLabel || '없음'}`;
+      if (s.openrouterModel) $('key-ormodel').value = s.openrouterModel;
+      if (s.openaiModel && s.openaiModel !== 'gpt-4o') $('key-openaimodel').value = s.openaiModel;
       // 저장돼 있는 개인키 표시(빈 칸으로 저장해도 안 지워짐을 알림)
       const saved = [];
-      if (s.usingPersonal) saved.push('Claude');
-      if (s.usingPersonalGemini) saved.push('Gemini');
+      if (s.hasClaude) saved.push('Claude');
+      if (s.hasGemini) saved.push('Gemini');
+      if (s.hasGpt) saved.push('GPT');
       if (s.openrouterStored) saved.push('OpenRouter' + (s.openrouterOff ? '(꺼짐)' : ''));
       if (saved.length) txt += `\n저장된 개인키: ${saved.join(', ')} · 빈 칸으로 저장해도 안 지워져요`;
+      else txt += '\n(공유 키로 동작 중 — 개인 키를 넣으면 그걸로 바뀌어요)';
       $('key-status').textContent = txt; $('key-status').className = 'key-status ' + cls;
       // OpenRouter 켜기/끄기 토글 버튼 (키가 저장돼 있을 때만)
       const btnOff = $('key-or-off');
@@ -424,19 +434,30 @@
   }
   $('keybadge').addEventListener('click', openKeys);
   $('key-close').addEventListener('click', () => $('keypanel').classList.remove('show'));
+  // 메인/어시스턴트 선택 즉시 반영
+  async function saveRole(field, value) {
+    try {
+      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [field]: value }) })).json();
+      if (d.ok) { renderKeyBadge(d); renderRoles(d); renderMode(d); }
+    } catch { alert('처리 중 문제가 생겼어요.'); }
+  }
+  if ($('role-main')) $('role-main').addEventListener('change', (e) => saveRole('main', e.target.value));
+  if ($('role-assistant')) $('role-assistant').addEventListener('change', (e) => saveRole('assistant', e.target.value));
   $('key-save').addEventListener('click', async () => {
     const anthropic = $('key-anthropic').value.trim(), gemini = $('key-gemini').value.trim();
+    const openai = $('key-openai').value.trim(), openaiModel = $('key-openaimodel').value.trim();
     const openrouter = $('key-openrouter').value.trim(), openrouterModel = $('key-ormodel').value.trim();
-    if (!anthropic && !gemini && !openrouter) return alert('키를 입력하세요.');
+    if (!anthropic && !gemini && !openai && !openrouter) return alert('키를 입력하세요.');
     // 입력한 것만 보냄 → 빈 칸은 기존 저장 키를 건드리지 않음
     const patch = {};
+    if (openai) { patch.openai = openai; if (openaiModel) patch.openaiModel = openaiModel; }
     if (anthropic) patch.anthropic = anthropic;
     if (gemini) patch.gemini = gemini;
     if (openrouter) { patch.openrouter = openrouter; patch.openrouterModel = openrouterModel; }
     const btn = $('key-save'); btn.disabled = true; btn.textContent = '확인 중…';
     try {
       const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) })).json();
-      if (d.ok) { renderKeyBadge(d); $('keypanel').classList.remove('show'); addLine('lead', d.usingOpenRouter ? `OpenRouter로 바꿨어요 (${d.openrouterModel}). 🔑` : '내 개인 키로 바꿨어요. 이제 공유 한도와 무관하게 쓸 수 있어요 🔑'); }
+      if (d.ok) { renderKeyBadge(d); $('keypanel').classList.remove('show'); addLine('lead', `개인 키를 저장했어요 (메인: ${d.mainLabel}${d.assistant && d.assistant !== 'none' ? ', 어시스턴트: ' + d.assistantLabel : ''}) 🔑`); }
       else alert(d.error || '저장 실패');
     } catch { alert('저장 중 문제가 생겼어요.'); }
     finally { btn.disabled = false; btn.textContent = '저장하고 내 키 쓰기'; }
@@ -503,7 +524,7 @@
   // ── 상태 & 일정 ──
   function bootStatus() {
   return fetch('/api/status?uid=' + encodeURIComponent(UID)).then((r) => r.json()).then((s) => {
-    statusEl.textContent = `Claude ${s.claude ? '✅' : '✕'} · Gemini ${s.gemini ? '✅' : '✕'}`;
+    statusEl.textContent = s.claude ? `${s.mainLabel} ✅${s.assistant && s.assistant !== 'none' ? ' · 보조 ' + s.assistantLabel : ''}` : 'AI 키 없음';
     statusEl.classList.toggle('on', s.claude || s.gemini);
     renderKeyBadge(s);
     if (s.brand) { const b = document.querySelector('.brand'); if (b) b.textContent = '🌱 ' + s.brand; document.title = s.brand + ' · AI 비서'; }
