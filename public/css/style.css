@@ -303,3 +303,11 @@ body {
 .role-row label .opt { color: #8aa08f; font-weight: normal; font-size: 11.5px; }
 .role-row select { padding: 6px 10px; border: 1px solid #cdddd0; border-radius: 8px; font-size: 12.5px; background: #fbfffb; color: #1a2b20; cursor: pointer; }
 .role-hint { font-size: 11.5px; color: #6a7a6a; margin-top: 6px; line-height: 1.5; white-space: pre-line; }
+
+/* ── 개인정보 경고 배너 ── */
+.privacy-note {
+  font-size: 11.5px; line-height: 1.5; color: #7a5713;
+  background: #fbf1d8; border: 1px solid #eccf84; border-radius: 8px;
+  padding: 7px 11px; margin: 0 0 7px;
+}
+.privacy-note b { color: #6a4a10; }

@@ -152,7 +152,7 @@
               <button id="key-or-off" hidden title="OpenRouter를 끄고, 저장된 Claude/Gemini 개인키(없으면 공유키)로 돌아가요">OpenRouter 끄기</button>
               <button id="key-reset">공유 키로 되돌리기</button>
             </div>
-            <div class="key-hint">🔒 개인 키는 <b>이 컴퓨터에만</b> 저장돼요(keys.json). 콘솔: platform.claude.com / aistudio.google.com</div>
+            <div class="key-hint">🔒 개인 키는 <b>이 컴퓨터에만</b> 저장돼요(keys.json).<br>⚠️ <b>학생 개인정보가 든 자료는 AI에 넣지 마세요.</b> Claude·GPT는 API 내용을 학습에 쓰지 않지만, <b>Gemini 무료 등급은 예외</b>일 수 있어요(민감 자료엔 Claude/GPT 권장).</div>
           </div>
         </div>
       </div>
@@ -231,6 +231,7 @@
       </div>
       <div id="chatlog"></div>
       <div id="refrow" hidden>📎 참고: <b id="refname"></b> <button id="refclear" title="참고 해제">✕</button></div>
+      <div class="privacy-note">🔒 <b>실제 학생 개인정보(실명·주민번호·연락처 등)는 입력하지 마세요.</b> 입력 내용은 AI(외부 서버)로 전송됩니다.</div>
       <div class="inputrow">
         <input id="chatinput" type="text" placeholder="말 걸기(오늘 일정 뭐야?) 또는 업무 입력 후 '팀에게 맡기기'" autocomplete="off" />
         <button id="sendbtn" title="팀장에게 짧게 물어보기">보내기</button>

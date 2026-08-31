@@ -59,9 +59,18 @@
     } else { pumping = false; pump(); }
   }
 
+  // 개인정보(주민번호·전화번호) 패턴 감지 — AI로 전송되기 전에 경고
+  function detectPII(t) {
+    t = String(t || '');
+    if (/\d{6}[-\s]?[1-4]\d{6}/.test(t)) return '주민등록번호';
+    if (/01[016789][-\s]?\d{3,4}[-\s]?\d{4}/.test(t)) return '전화번호';
+    return null;
+  }
   function runAgent(mode) {
     const msg = input.value.trim();
     if (!msg) { input.placeholder = '무엇을 도와드릴까요? (예: 오늘 일정 / 입교식 안내문 초안)'; input.focus(); return; }
+    const pii = detectPII(msg);
+    if (pii && !confirm(`⚠️ 입력에 ${pii}로 보이는 내용이 있어요.\n\nAI(외부 서버)로 그대로 전송됩니다. 실제 학생·개인 정보는 넣지 마세요.\n\n그래도 계속할까요?`)) { input.focus(); return; }
     if (running) return;
     running = true; input.value = '';
     meetingOn = false; turnCount = 0;
@@ -715,7 +724,7 @@
       if (work) await fetch('/api/onboard/confirm?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, work }) });
     } catch {}
     finishWizard();
-    setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱\n(궁금한 점·오류는 아래 "💬 문의·공지"로 편하게 물어보세요.)`), 400);
+    setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱\n⚠️ 단, 실제 학생 개인정보(실명·주민번호 등)는 입력하지 말아 주세요(AI로 전송돼요).\n(궁금한 점·오류는 아래 "💬 문의·공지"로 편하게 물어보세요.)`), 400);
     btn.disabled = false;
   });
 
