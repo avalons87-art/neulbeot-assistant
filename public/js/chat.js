@@ -461,11 +461,21 @@
     } catch { alert('처리 중 문제가 생겼어요.'); }
   });
   // ── 자동 업데이트 (git 없이) ──
+  async function forceApplyUpdate(c) {
+    addLine('lead', `🔒 필수 업데이트(${c.remote})를 적용하고 있어요. 잠시만 기다려 주세요… (자동 재시작 후 새로고침돼요)`);
+    if (window.Game) Game.mascotThinking();
+    try {
+      const d = await (await fetch('/api/update/apply', { method: 'POST' })).json();
+      if (d.ok) { addLine('lead', `✅ 업데이트 완료 (파일 ${d.copied}개)! 재시작 중이에요. 잠시 뒤 자동으로 새로고침돼요.`); setTimeout(() => location.reload(), 15000); }
+      else { addLine('lead', '필수 업데이트 실패: ' + (d.error || '') + ' — 🔃 버튼으로 다시 시도해 주세요.'); $('updatebtn').textContent = '🔃 업데이트 있음'; $('updatebtn').classList.add('has-update'); }
+    } catch { addLine('lead', '업데이트 적용 중이에요(재시작 중일 수 있어요). 15초 뒤 자동 새로고침…'); setTimeout(() => location.reload(), 15000); }
+  }
   (async () => {
     try {
       const d = await (await fetch('/api/update/check')).json();
       if (d.noSource) return; // 업데이트 출처 미설정 → 버튼 숨김
       $('updatebtn').hidden = false;
+      if (d.available && d.force) { forceApplyUpdate(d); return; } // 주요 업데이트 → 버튼 없이 자동
       if (d.available) { $('updatebtn').textContent = '🔃 업데이트 있음'; $('updatebtn').classList.add('has-update'); }
     } catch {}
   })();

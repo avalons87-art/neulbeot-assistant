@@ -28,8 +28,10 @@ async function checkUpdate() {
   const url = `https://raw.githubusercontent.com/${src.owner}/${src.repo}/${src.branch}/package.json`;
   const r = await fetch(url, { headers: { 'Cache-Control': 'no-cache' } });
   if (!r.ok) throw new Error(`버전 확인 실패(${r.status}). 저장소/브랜치 확인.`);
-  const remote = (await r.json()).version || '';
-  return { available: !!remote && remote !== local, remote, local, source: `${src.owner}/${src.repo}@${src.branch}` };
+  const remotePkg = await r.json();
+  const remote = remotePkg.version || '';
+  // forceUpdate:true 인 릴리스는 교사 앱이 버튼 없이 자동 적용(주요 업데이트 강제)
+  return { available: !!remote && remote !== local, remote, local, force: !!remotePkg.forceUpdate, source: `${src.owner}/${src.repo}@${src.branch}` };
 }
 
 // 덮어쓰면 안 되는 것(키·개인설정) + 스킵 디렉터리
