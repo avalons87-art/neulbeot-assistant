@@ -606,12 +606,15 @@
       if (work) await fetch('/api/onboard/confirm?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, work }) });
     } catch {}
     finishWizard();
-    setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱`), 400);
+    setTimeout(() => addLine('lead', `반가워요 ${UID} 선생님! 첫 설정을 마쳤어요. 파악한 업무를 기억하고 도와드릴게요 🌱\n(궁금한 점·오류는 아래 "💬 문의·공지"로 편하게 물어보세요.)`), 400);
     btn.disabled = false;
   });
 
   // 🧭 첫 설정 — 언제든 마법사 다시 열기(기존 이름/폴더/일정은 그대로, 다시 확인·변경 가능)
   $('setupbtn').addEventListener('click', openWizard);
+  // 💬 문의·공지 (카카오톡 오픈채팅)
+  $('helpbtn').addEventListener('click', () => $('helppanel').classList.add('show'));
+  $('help-close').addEventListener('click', () => $('helppanel').classList.remove('show'));
 
   // ── 부팅: 이름이 아직 없으면(처음 사용) 마법사, 있으면 바로 시작 ──
   if (UID) { localStorage.setItem('nb_onboarded', '1'); startApp(); }
