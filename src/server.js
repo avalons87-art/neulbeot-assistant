@@ -91,6 +91,19 @@ app.post('/api/folder', (req, res) => {
   } catch (e) { res.status(400).json({ ok: false, error: e.message }); }
 });
 
+// 진짜 윈도우 폴더 선택창(탐색기) 띄우기 — 서버=본인 PC(로컬 설치)일 때 절대경로를 받는다.
+app.get('/api/pick-folder', (req, res) => {
+  if (!isOwner(req)) return res.status(403).json({ ok: false, error: '이 기능은 본인 PC(소유자)에서만 돼요.' });
+  if (process.platform !== 'win32') return res.json({ ok: false, unsupported: true, error: 'Windows에서만 폴더 선택창을 띄울 수 있어요.' });
+  const ps = "Add-Type -AssemblyName System.Windows.Forms; $d=New-Object System.Windows.Forms.FolderBrowserDialog; $d.Description='Neulbeot - select work folder'; $d.ShowNewFolderButton=$true; $t=New-Object System.Windows.Forms.Form; $t.TopMost=$true; $t.ShowInTaskbar=$false; $t.Opacity=0; $t.Show(); $t.Activate(); $r=$d.ShowDialog($t); $t.Dispose(); if($r -eq [System.Windows.Forms.DialogResult]::OK){[Console]::Out.Write($d.SelectedPath)}";
+  execFile('powershell.exe', ['-STA', '-NoProfile', '-WindowStyle', 'Hidden', '-Command', ps], { timeout: 180000, windowsHide: true }, (err, stdout) => {
+    if (err && err.killed) return res.json({ ok: false, error: '시간이 초과됐어요(선택창을 못 찾았을 수 있어요).' });
+    const p = String(stdout || '').trim();
+    if (!p) return res.json({ ok: true, cancelled: true }); // 사용자가 취소
+    res.json({ ok: true, path: p.replace(/\\/g, '/') });
+  });
+});
+
 // 폴더 선택창 — 서버 폴더를 클릭으로 타고 들어가 고르기. dirs=하위폴더, drives=드라이브(루트).
 app.get('/api/browse', (req, res) => {
   const owner = isOwner(req);

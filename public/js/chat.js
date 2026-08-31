@@ -314,11 +314,29 @@
     } catch { ctx.list.innerHTML = '<div class="loading">불러오지 못했어요.</div>'; }
   }
 
-  $('folder-set').addEventListener('click', async () => {
-    filepanel.classList.remove('show');
+  // 진짜 윈도우 폴더 선택창(탐색기) — 서버=본인 PC일 때 절대경로를 받음
+  async function pickFolderNative() {
+    try { return await (await fetch('/api/pick-folder?uid=' + encodeURIComponent(UID))).json(); }
+    catch { return { ok: false, error: '연결 실패' }; }
+  }
+  // 앱 내 목록 탐색(폴백)
+  async function openFolderBrowser() {
     let cur = ''; try { cur = (await (await fetch('/api/folder?uid=' + encodeURIComponent(UID))).json()).folder || ''; } catch {}
     folderpick.classList.add('show');
-    browse(cur); // 현재 폴더에서 시작(없으면 드라이브)
+    browse(cur);
+  }
+  $('folder-set').addEventListener('click', async () => {
+    filepanel.classList.remove('show');
+    const d = await pickFolderNative();
+    if (d.ok && d.path) { saveFolder(d.path); return; }  // 탐색기로 선택함
+    if (d.ok && d.cancelled) return;                      // 취소
+    openFolderBrowser();                                  // 미지원/오류 → 목록 탐색 폴백
+  });
+  $('pick-native') && $('pick-native').addEventListener('click', async () => {
+    const d = await pickFolderNative();
+    if (d.ok && d.path) { folderpick.classList.remove('show'); saveFolder(d.path); }
+    else if (d.ok && d.cancelled) { /* 취소 */ }
+    else alert(d.error || '탐색기를 열 수 없어요.');
   });
   $('pick-close').addEventListener('click', () => folderpick.classList.remove('show'));
   async function saveFolder(folderPath) {
@@ -599,16 +617,26 @@
   });
 
   // ③ 업무 폴더
+  async function wizApplyFolder(path) {
+    const msg = $('wiz-folder-msg');
+    try {
+      const d = await (await fetch('/api/folder?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, folder: path }) })).json();
+      if (d.ok) { analyzed = false; msg.textContent = '✅ 업무 폴더로 설정했어요: ' + d.folder; msg.className = 'wiz-msg ok'; setTimeout(() => wizGo(4), 800); return true; }
+      msg.textContent = (d.error || '설정 실패'); msg.className = 'wiz-msg err'; return false;
+    } catch { msg.textContent = '설정 중 문제가 생겼어요.'; msg.className = 'wiz-msg err'; return false; }
+  }
+  $('wiz-folder-native').addEventListener('click', async () => {
+    const msg = $('wiz-folder-msg'); msg.textContent = '탐색기 창에서 폴더를 골라주세요…'; msg.className = 'wiz-msg';
+    const d = await pickFolderNative();
+    if (d.ok && d.path) await wizApplyFolder(d.path);
+    else if (d.ok && d.cancelled) msg.textContent = '';
+    else { msg.textContent = (d.error || '탐색기를 열 수 없어요. 아래 목록에서 골라주세요.'); msg.className = 'wiz-msg err'; }
+  });
   $('wiz-folder-apply').addEventListener('click', async () => {
     const msg = $('wiz-folder-msg');
-    if (!wizPickCurrent) { msg.textContent = '폴더 안으로 들어간 뒤 "이 폴더로 설정"을 누르세요. (또는 "건너뛰기")'; msg.className = 'wiz-msg err'; return; }
+    if (!wizPickCurrent) { msg.textContent = '폴더 안으로 들어간 뒤 "이 폴더로 설정"을 누르세요. (또는 "🗂 Windows 탐색기로 찾기")'; msg.className = 'wiz-msg err'; return; }
     const btn = $('wiz-folder-apply'); btn.disabled = true;
-    try {
-      const d = await (await fetch('/api/folder?uid=' + encodeURIComponent(UID), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uid: UID, folder: wizPickCurrent }) })).json();
-      if (d.ok) { analyzed = false; msg.textContent = '✅ 업무 폴더로 설정했어요: ' + d.folder; msg.className = 'wiz-msg ok'; setTimeout(() => wizGo(4), 800); }
-      else { msg.textContent = (d.error || '설정 실패'); msg.className = 'wiz-msg err'; }
-    } catch { msg.textContent = '설정 중 문제가 생겼어요.'; msg.className = 'wiz-msg err'; }
-    finally { btn.disabled = false; }
+    try { await wizApplyFolder(wizPickCurrent); } finally { btn.disabled = false; }
   });
 
   // ④ 업무 파악·확인
