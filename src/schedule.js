@@ -1,6 +1,5 @@
 // 학사일정 조회 헬퍼. 실제 일정은 앱에서 불러온 것(schedule.json)을 쓴다.
 // 아래 EVENTS 는 형식 참고용 예시일 뿐, 자동 기본값으로 쓰이지 않는다.
-// CLAUDE.md의 학사일정을 기계가 읽을 수 있는 형태로 정리한 것.
 // 날짜는 'YYYY-MM-DD' 형식.
 
 const EVENTS = [
@@ -32,7 +31,6 @@ let customEvents = [];
 try { const j = JSON.parse(fs.readFileSync(SCHED_FILE, 'utf8')); if (Array.isArray(j.events)) customEvents = j.events; } catch {}
 
 // 불러온 일정이 있으면 그걸, 없으면 비움(학교 중립 — 각 학교 일정을 넣어 쓰도록).
-// (EVENTS 는 세종늘벗학교 예시로 남겨두되 자동 기본값으로는 쓰지 않음)
 function activeEvents() { return customEvents.length ? customEvents : []; }
 function source() { return customEvents.length ? 'custom' : 'none'; }
 

@@ -1,5 +1,5 @@
 // git 없이 자동 업데이트 — GitHub에서 최신 코드를 zip으로 받아 스스로 교체.
-// 버전은 package.json 의 version 으로 비교(신현종 선생님이 배포 때 올림).
+// 버전은 package.json 의 version 으로 비교(배포자가 릴리스 때 올림).
 // 키·개인설정 파일은 절대 덮어쓰지 않는다.
 
 const fs = require('fs');

@@ -1,7 +1,7 @@
 {
   "name": "neulbeot-assistant",
-  "version": "0.9.2",
-  "description": "세종늘벗학교 픽셀 캐릭터 AI 비서 (늘벗이)",
+  "version": "0.9.3",
+  "description": "학교 업무 AI 비서 - 픽셀 캐릭터 팀 (늘벗이 팀)",
   "main": "src/server.js",
   "scripts": {
     "start": "node --use-system-ca src/server.js",

@@ -22,7 +22,7 @@ echo Building teacher package (copies node_modules, may take a minute)...
 if exist "%DEST%" rmdir /s /q "%DEST%"
 mkdir "%DEST%"
 
-robocopy "%SRC%" "%DEST%" /E /NFL /NDL /NJH /NJS /NP /XF my-keys.bat owner.txt work-dir.txt user-folders.json user-profiles.json folder-analysis.json keys.json schedule.json brand.txt brand-teacher.txt teacher-keys.bat make-teacher-package.bat /XD outputs .git .claude >nul
+robocopy "%SRC%" "%DEST%" /E /NFL /NDL /NJH /NJS /NP /XF README.md my-keys.bat owner.txt work-dir.txt user-folders.json user-profiles.json folder-analysis.json keys.json schedule.json brand.txt brand-teacher.txt teacher-keys.bat make-teacher-package.bat /XD outputs .git .claude dev-docs >nul
 
 REM Set the teacher-version brand name
 if exist "%SRC%\brand-teacher.txt" (

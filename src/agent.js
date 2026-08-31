@@ -231,7 +231,7 @@ async function run(userText, emit, opts = {}) {
   const tools = folder ? TOOLS : TOOLS.filter((t) => !FILE_TOOLS.includes(t.name));
   // 담당 선생님(이름·학교) + 온보딩에서 확인한 '내 업무 범위' + 폴더 개요를 시스템에 심어 팀장이 알고 시작
   let system = SYSTEM;
-  if (opts.who) system += `\n\n[담당 선생님: ${opts.who}] — 이 선생님과 학교 상황에 맞춰 도와라. 특정 학교(예: 세종늘벗학교)를 임의로 가정하지 말고, 모르는 학교 정보는 지어내지 마라.`;
+  if (opts.who) system += `\n\n[담당 선생님: ${opts.who}] — 이 선생님과 학교 상황에 맞춰 도와라. 설정되지 않은 학교 정보를 임의로 가정하거나 지어내지 마라.`;
   if (store.workProfile) system += `\n\n[담당 선생님이 확인한 업무 범위 — 이 사람의 실제 업무다]\n${store.workProfile}\n(이 범위를 기억하고, 관련해 먼저 도와드려라.)`;
   if (store.folderOverview) system += `\n\n[현재 업무 폴더 개요 — 이미 파악한 내용]\n${store.folderOverview}\n(구체적 문서가 필요하면 search_files/read_document 로 찾아 읽어라.)`;
   const messages = store.agentMessages; // 참조(누적 = 연속성)

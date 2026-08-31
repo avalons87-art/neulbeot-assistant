@@ -2,7 +2,7 @@
 title Neulbeot Assistant - Firewall Setup
 REM ============================================================
 REM  Allow other teachers on the school network to reach this
-REM  server. RUN THIS ONCE, as Administrator (right-click > 관리자 권한).
+REM  server. RUN THIS ONCE, as Administrator (right-click > Run as admin).
 REM  Opens TCP port 4000 for inbound connections.
 REM ============================================================
 set PORT=4000
