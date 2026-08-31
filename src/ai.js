@@ -34,9 +34,14 @@ function openrouterModel() { return cleanKey(personal.openrouterModel || process
 
 // 어느 제공자로 Claude 역할(팀장/에이전트/파싱)을 처리할지: OpenRouter 키가 있으면 그걸 우선.
 function provider() {
-  if (openrouterKey() && openrouterModel()) return 'openrouter';
+  if (openrouterKey() && openrouterModel() && !personal.openrouterOff) return 'openrouter';
   if (anthropicKey() && Anthropic) return 'anthropic';
   return 'none';
+}
+// OpenRouter를 켜기/끄기(키는 지우지 않고 보존 — 껐다 켰다 전환)
+function setOpenRouterEnabled(on) {
+  if (on) delete personal.openrouterOff; else personal.openrouterOff = true;
+  savePersonal(personal); client = null; clientKey = null;
 }
 
 // OpenRouter(OpenAI 호환) 원본 호출. messages=OpenAI 형식. 반환: 응답 JSON.
@@ -273,6 +278,8 @@ function setKeys(patch = {}) {
   for (const k of ['anthropic', 'gemini', 'openrouter', 'openrouterModel']) {
     if (patch[k] !== undefined) { const v = cleanKey(patch[k]); if (v) next[k] = v; else delete next[k]; }
   }
+  // OpenRouter 키를 새로 넣으면 자동으로 켜짐 상태로
+  if (patch.openrouter && cleanKey(patch.openrouter)) delete next.openrouterOff;
   personal = next; savePersonal(personal);
   client = null; clientKey = null;
 }
@@ -289,8 +296,10 @@ function status() {
     usingPersonalGemini: !!personal.gemini,
     usingOpenRouter: p === 'openrouter',
     openrouterModel: openrouterModel() || null,
+    openrouterStored: !!(openrouterKey() && openrouterModel()), // 키가 저장돼 있는가(끔 상태 포함)
+    openrouterOff: !!personal.openrouterOff,                     // 저장돼 있지만 꺼둔 상태인가
     sharedAvailable: !!process.env.ANTHROPIC_API_KEY,
   };
 }
 
-module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, status, CLAUDE_MODEL, GEMINI_MODEL };
+module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, setOpenRouterEnabled, status, CLAUDE_MODEL, GEMINI_MODEL };

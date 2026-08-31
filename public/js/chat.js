@@ -390,11 +390,18 @@
       const saved = [];
       if (s.usingPersonal) saved.push('Claude');
       if (s.usingPersonalGemini) saved.push('Gemini');
-      if (s.usingOpenRouter) saved.push('OpenRouter');
+      if (s.openrouterStored) saved.push('OpenRouter' + (s.openrouterOff ? '(꺼짐)' : ''));
       if (saved.length) txt += `\n저장된 개인키: ${saved.join(', ')} · 빈 칸으로 저장해도 안 지워져요`;
       $('key-status').textContent = txt; $('key-status').className = 'key-status ' + cls;
-      // OpenRouter 사용 중이면 '끄고 되돌리기' 버튼 노출
-      $('key-or-off').hidden = !s.usingOpenRouter;
+      // OpenRouter 켜기/끄기 토글 버튼 (키가 저장돼 있을 때만)
+      const btnOff = $('key-or-off');
+      if (s.openrouterStored) {
+        btnOff.hidden = false;
+        const on = !s.openrouterOff;
+        btnOff.dataset.on = on ? '1' : '0';
+        btnOff.textContent = on ? 'OpenRouter 끄기' : `OpenRouter 켜기 (${s.openrouterModel || ''})`;
+        btnOff.title = on ? 'OpenRouter를 끄고 저장된 Claude/Gemini(없으면 공유키)로 전환. 키는 보존돼요.' : '저장된 OpenRouter 키로 다시 켜기';
+      } else btnOff.hidden = true;
     } catch { $('key-status').textContent = '상태를 못 불러왔어요.'; }
   }
   $('keybadge').addEventListener('click', openKeys);
@@ -416,13 +423,15 @@
     } catch { alert('저장 중 문제가 생겼어요.'); }
     finally { btn.disabled = false; btn.textContent = '저장하고 내 키 쓰기'; }
   });
-  // OpenRouter만 끄고, 저장된 Claude/Gemini 개인키(없으면 공유키)로 되돌리기
+  // OpenRouter 켜기/끄기 토글 (키는 보존 — 껐다 켰다 전환)
   $('key-or-off').addEventListener('click', async () => {
+    const turnOn = $('key-or-off').dataset.on !== '1'; // 지금 꺼져 있으면 켠다
     try {
-      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openrouter: '', openrouterModel: '' }) })).json();
+      const d = await (await fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openrouterEnabled: turnOn }) })).json();
       if (d.ok) {
         renderKeyBadge(d); $('keypanel').classList.remove('show');
-        addLine('lead', d.usingPersonal ? '내 개인 Claude 키로 돌아왔어요 🔑' : (d.sharedAvailable ? '공유 키로 돌아왔어요 🔑' : 'OpenRouter를 껐어요.'));
+        if (turnOn) addLine('lead', `OpenRouter를 다시 켰어요 (${d.openrouterModel || ''}) 🔑`);
+        else addLine('lead', d.usingPersonal ? 'OpenRouter를 끄고 내 개인 Claude 키로 전환했어요 (OpenRouter 키는 보존) 🔑' : (d.sharedAvailable ? 'OpenRouter를 끄고 공유 키로 전환했어요 (OpenRouter 키는 보존) 🔑' : 'OpenRouter를 껐어요.'));
       } else alert(d.error || '처리 실패');
     } catch { alert('처리 중 문제가 생겼어요.'); }
   });

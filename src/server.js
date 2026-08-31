@@ -56,13 +56,14 @@ app.get('/api/status', (req, res) => {
 
 // API 키 조회 / 개인키 설정 (공유 키 → 개인 키 교체)
 app.get('/api/keys', (req, res) => {
-  const s = ai.status();
-  res.json({ ok: true, claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable });
+  res.json({ ok: true, ...pubKeyStatus() });
 });
 app.post('/api/keys', async (req, res) => {
-  const { anthropic, gemini, openrouter, openrouterModel, reset } = req.body || {};
+  const { anthropic, gemini, openrouter, openrouterModel, reset, openrouterEnabled } = req.body || {};
   try {
-    if (reset) { ai.setKeys({ anthropic: '', gemini: '', openrouter: '', openrouterModel: '' }); return res.json({ ok: true, reset: true, ...pubKeyStatus() }); }
+    // OpenRouter 켜기/끄기 토글 (키는 보존)
+    if (openrouterEnabled !== undefined) { ai.setOpenRouterEnabled(!!openrouterEnabled); return res.json({ ok: true, ...pubKeyStatus() }); }
+    if (reset) { ai.setKeys({ anthropic: '', gemini: '', openrouter: '', openrouterModel: '' }); ai.setOpenRouterEnabled(true); return res.json({ ok: true, reset: true, ...pubKeyStatus() }); }
     // 저장 전 유효성 검사(입력된 것만)
     if (openrouter) {
       if (!openrouterModel) return res.status(400).json({ ok: false, error: 'OpenRouter 모델도 입력하세요 (예: anthropic/claude-sonnet-4.5).' });
@@ -76,7 +77,7 @@ app.post('/api/keys', async (req, res) => {
     res.status(400).json({ ok: false, error: 'Claude 키가 유효하지 않아요: ' + e.message });
   }
 });
-function pubKeyStatus() { const s = ai.status(); return { claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable }; }
+function pubKeyStatus() { const s = ai.status(); return { claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable, openrouterStored: s.openrouterStored, openrouterOff: s.openrouterOff }; }
 
 // 내 업무 폴더 조회 / 설정
 app.get('/api/folder', (req, res) => {
