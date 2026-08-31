@@ -77,7 +77,15 @@ app.post('/api/keys', async (req, res) => {
     res.status(400).json({ ok: false, error: 'Claude 키가 유효하지 않아요: ' + e.message });
   }
 });
-function pubKeyStatus() { const s = ai.status(); return { claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable, openrouterStored: s.openrouterStored, openrouterOff: s.openrouterOff }; }
+function pubKeyStatus() { const s = ai.status(); return { claude: s.claude, gemini: s.gemini, usingPersonal: s.usingPersonal, usingPersonalGemini: s.usingPersonalGemini, usingOpenRouter: s.usingOpenRouter, openrouterModel: s.openrouterModel, sharedAvailable: s.sharedAvailable, openrouterStored: s.openrouterStored, openrouterOff: s.openrouterOff, mode: s.mode, modeModel: s.modeModel }; }
+
+// AI 모드(절약/균형/품질) 설정
+app.post('/api/mode', (req, res) => {
+  const m = (req.body && req.body.mode) || '';
+  if (!['saver', 'balanced', 'quality'].includes(m)) return res.status(400).json({ ok: false, error: '잘못된 모드예요.' });
+  ai.setMode(m);
+  res.json({ ok: true, ...pubKeyStatus() });
+});
 
 // 내 업무 폴더 조회 / 설정
 app.get('/api/folder', (req, res) => {

@@ -375,12 +375,30 @@
     else if (s.sharedAvailable) b.textContent = '🔑 공유 키';
     else b.textContent = '🔑 키 없음';
   }
+  function renderMode(s) {
+    const mode = s.mode || 'quality';
+    document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    const hints = {
+      saver: '💚 절약: 가장 저렴한 모델(Haiku). 일정 안내·간단 정리에 좋아요. 복잡한 문서는 품질이 다소 낮을 수 있어요.',
+      balanced: '⚖️ 균형: 중간 모델(Sonnet). 비용·품질 절충 (품질의 약 1/2 비용).',
+      quality: '💎 품질: 최고 모델(Opus, 기본). 문서 품질 최상, 비용은 가장 높아요.',
+    };
+    const h = $('mode-hint');
+    if (h) h.textContent = (hints[mode] || '') + (s.usingOpenRouter ? '\n※ 지금은 OpenRouter 사용 중이라 이 모드는 적용 안 돼요(OpenRouter를 끄면 적용).' : '');
+  }
+  document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', async () => {
+    try {
+      const d = await (await fetch('/api/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: b.dataset.mode }) })).json();
+      if (d.ok) { renderMode(d); renderKeyBadge(d); }
+      else alert(d.error || '설정 실패');
+    } catch { alert('처리 중 문제가 생겼어요.'); }
+  }));
   async function openKeys() {
     $('keypanel').classList.add('show');
     $('key-anthropic').value = ''; $('key-gemini').value = ''; $('key-openrouter').value = ''; $('key-ormodel').value = '';
     try {
       const s = await (await fetch('/api/keys')).json();
-      renderKeyBadge(s);
+      renderKeyBadge(s); renderMode(s);
       let txt, cls;
       if (s.usingOpenRouter) { txt = `현재: OpenRouter 사용 중 (${s.openrouterModel || ''})`; cls = 'personal'; if (s.openrouterModel) $('key-ormodel').value = s.openrouterModel; }
       else if (s.usingPersonal) { txt = '현재: 내 개인 Claude 키 사용 중 (공유 한도와 무관)'; cls = 'personal'; }

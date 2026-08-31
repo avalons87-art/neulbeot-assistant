@@ -8,6 +8,13 @@ const path = require('path');
 const KEYS_FILE = path.join(__dirname, '..', 'keys.json');
 const CLAUDE_MODEL = process.env.MODEL || 'claude-opus-4-8';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+// AI 모드별 Claude 모델 — 절약(가장 저렴) / 균형 / 품질(기본). 자주 쓰는 대화·문서 작업에 적용.
+const MODE_MODEL = { saver: 'claude-haiku-4-5', balanced: 'claude-sonnet-4-6', quality: CLAUDE_MODEL };
+function currentMode() { return MODE_MODEL[personal.mode] ? personal.mode : 'quality'; }
+function activeModel() { return MODE_MODEL[currentMode()]; }
+// 저렴 모델(haiku)은 effort 파라미터를 지원하지 않으므로 제외.
+function effortCfg(model, effort) { return /haiku/i.test(model) ? {} : { output_config: { effort: effort || 'medium' } }; }
+function setMode(m) { if (MODE_MODEL[m]) { personal.mode = m; savePersonal(personal); client = null; clientKey = null; } }
 
 let Anthropic = null;
 try { Anthropic = require('@anthropic-ai/sdk'); }
@@ -81,10 +88,11 @@ async function callClaude(system, user, opts = {}) {
   if (provider() === 'openrouter') { try { return await orText(system, user, opts); } catch (e) { console.warn('[ai] OpenRouter 실패:', e.message); throw e; } }
   const c = getClient(); if (!c) return null;
   const history = Array.isArray(opts.history) ? opts.history : [];
+  const model = activeModel();
   const res = await c.messages.create({
-    model: CLAUDE_MODEL,
+    model,
     max_tokens: opts.maxTokens || 600,
-    output_config: { effort: opts.effort || 'medium' },
+    ...effortCfg(model, opts.effort),
     system,
     messages: [...history, { role: 'user', content: user }],
   });
@@ -168,8 +176,9 @@ function withCacheBreakpoint(messages) {
 }
 async function claudeAgent({ system, messages, tools, maxTokens = 4096, effort = 'medium' }) {
   const c = getClient(); if (!c) return null;
+  const model = activeModel();
   const sys = typeof system === 'string' ? [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }] : system;
-  const res = await c.messages.create({ model: CLAUDE_MODEL, max_tokens: maxTokens, output_config: { effort }, system: sys, tools, messages: withCacheBreakpoint(messages) });
+  const res = await c.messages.create({ model, max_tokens: maxTokens, ...effortCfg(model, effort), system: sys, tools, messages: withCacheBreakpoint(messages) });
   const u = res.usage || {};
   if (process.env.NB_LOG_CACHE === '1')
     console.log(`[cache] read=${u.cache_read_input_tokens || 0} write=${u.cache_creation_input_tokens || 0} in=${u.input_tokens || 0}`);
@@ -299,7 +308,9 @@ function status() {
     openrouterStored: !!(openrouterKey() && openrouterModel()), // 키가 저장돼 있는가(끔 상태 포함)
     openrouterOff: !!personal.openrouterOff,                     // 저장돼 있지만 꺼둔 상태인가
     sharedAvailable: !!process.env.ANTHROPIC_API_KEY,
+    mode: currentMode(),                     // saver | balanced | quality
+    modeModel: p === 'openrouter' ? openrouterModel() : activeModel(),
   };
 }
 
-module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, setOpenRouterEnabled, status, CLAUDE_MODEL, GEMINI_MODEL };
+module.exports = { callClaude, callGemini, claudeAgent, extractSchedule, transcribeImage, orChat, provider, openrouterModel, testAnthropicKey, testGeminiKey, testOpenRouterKey, setKeys, setOpenRouterEnabled, setMode, status, CLAUDE_MODEL, GEMINI_MODEL };
