@@ -17,10 +17,20 @@ function loadPersonal() { try { return JSON.parse(fs.readFileSync(KEYS_FILE, 'ut
 function savePersonal(o) { try { fs.writeFileSync(KEYS_FILE, JSON.stringify(o, null, 2), 'utf8'); } catch (e) { console.warn('[ai] keys.json 저장 실패:', e.message); } }
 let personal = loadPersonal();
 
-function anthropicKey() { return (personal.anthropic || process.env.ANTHROPIC_API_KEY || '').trim(); }
-function geminiKey() { return (personal.gemini || process.env.GEMINI_API_KEY || '').trim(); }
-function openrouterKey() { return (personal.openrouter || process.env.OPENROUTER_API_KEY || '').trim(); }
-function openrouterModel() { return (personal.openrouterModel || process.env.OPENROUTER_MODEL || '').trim(); }
+// 키 정리: 앞뒤 공백 + 눈에 안 보이는 문자(제로폭·BOM·비분리공백) 제거 → 헤더 오류 예방.
+function cleanKey(s) { return String(s || '').replace(/[​-‍﻿ ]/g, '').trim(); }
+// 보이는 비ASCII 문자(예: '•')가 있으면 친절히 안내(자동 제거는 위험하니 알려서 다시 복사하게).
+function assertAsciiKey(key, label) {
+  for (let i = 0; i < key.length; i++) {
+    const c = key.charCodeAt(i);
+    if (c < 32 || c > 126) throw new Error(`${label} 키에 허용되지 않는 문자가 섞여 있어요(${i + 1}번째 글자 '${key[i]}'). 키를 새로 복사해 붙여넣어 주세요 — 가려진 표시(••••)나 서식 있는 화면에서 복사하면 특수문자가 딸려올 수 있어요.`);
+  }
+  return key;
+}
+function anthropicKey() { return cleanKey(personal.anthropic || process.env.ANTHROPIC_API_KEY); }
+function geminiKey() { return cleanKey(personal.gemini || process.env.GEMINI_API_KEY); }
+function openrouterKey() { return cleanKey(personal.openrouter || process.env.OPENROUTER_API_KEY); }
+function openrouterModel() { return cleanKey(personal.openrouterModel || process.env.OPENROUTER_MODEL); }
 
 // 어느 제공자로 Claude 역할(팀장/에이전트/파싱)을 처리할지: OpenRouter 키가 있으면 그걸 우선.
 function provider() {
@@ -234,20 +244,24 @@ async function transcribeImage(imageB64, mediaType = 'image/jpeg', opts = {}) {
 // 주어진 키가 실제로 유효한지 소량 호출로 테스트(저장 전 검증). 성공=true, 실패=throw.
 async function testAnthropicKey(key) {
   if (!Anthropic) throw new Error('SDK가 없어요');
-  const c = new Anthropic({ apiKey: String(key || '').trim() });
+  const k = assertAsciiKey(cleanKey(key), 'Claude');
+  const c = new Anthropic({ apiKey: k });
   await c.messages.create({ model: CLAUDE_MODEL, max_tokens: 5, messages: [{ role: 'user', content: 'hi' }] });
   return true;
 }
 async function testGeminiKey(key) {
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}?key=${encodeURIComponent(String(key || '').trim())}`);
+  const k = assertAsciiKey(cleanKey(key), 'Gemini');
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}?key=${encodeURIComponent(k)}`);
   if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 100)}`);
   return true;
 }
 async function testOpenRouterKey(key, model) {
+  const k = assertAsciiKey(cleanKey(key), 'OpenRouter');
+  const m = cleanKey(model);
   const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { Authorization: 'Bearer ' + String(key || '').trim(), 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: String(model || '').trim(), messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
+    headers: { Authorization: 'Bearer ' + k, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: m, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 }),
   });
   if (!r.ok) throw new Error(`${r.status}: ${(await r.text()).slice(0, 150)}`);
   return true;
@@ -257,7 +271,7 @@ async function testOpenRouterKey(key, model) {
 function setKeys(patch = {}) {
   const next = { ...personal };
   for (const k of ['anthropic', 'gemini', 'openrouter', 'openrouterModel']) {
-    if (patch[k] !== undefined) { const v = String(patch[k] || '').trim(); if (v) next[k] = v; else delete next[k]; }
+    if (patch[k] !== undefined) { const v = cleanKey(patch[k]); if (v) next[k] = v; else delete next[k]; }
   }
   personal = next; savePersonal(personal);
   client = null; clientKey = null;
